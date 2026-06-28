@@ -1,11 +1,11 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { useDatabase } from '../context/DatabaseContext';
-import { Package, Check, Clock, User, MapPin } from 'lucide-react';
+import { Package, Check, Clock, User, MapPin, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
 const MILESTONES_SEQUENCE = [
-  'Pending Pickup', // Added implicit first state
+  'Pending Pickup',
   'Confirm Pickup',
   'Arrived at Transfer Hub',
   'Out for Last-Mile',
@@ -20,125 +20,188 @@ const CustomerTracking = () => {
   
   if (!parcel) {
     return (
-      <div className="mobile-container" style={{ textAlign: 'center', padding: '2rem' }}>
+      <div className="mobile-frame" style={{ justifyContent: 'center', alignItems: 'center', padding: '2rem', textAlign: 'center' }}>
+        <AlertCircle size={48} color="var(--error)" style={{ marginBottom: '1rem' }} />
         <h2>Parcel Not Found</h2>
-        <p>Please check your tracking link.</p>
+        <p style={{ color: 'var(--text-secondary)' }}>Please check your tracking link.</p>
       </div>
     );
   }
 
   const milestones = getMilestonesForParcel(parcelId);
   
-  // Create a timeline combining sequence with actual completed milestones
+  // Build tracking timeline list
   const timeline = MILESTONES_SEQUENCE.map((stepName, index) => {
-    if (index === 0 && milestones.length === 0) {
-      // Pending state when no actions taken yet
-      return { statusName: stepName, isCompleted: false, isCurrent: true };
+    if (index === 0) {
+      // Pending Pickup is completed if there are any milestones logged at all
+      const isCompleted = milestones.length > 0;
+      return {
+        statusName: stepName,
+        isCompleted,
+        isCurrent: milestones.length === 0, // Current if nothing else is logged
+        timestamp: isCompleted && milestones[0] ? milestones[0].timestamp : null,
+        description: 'Order details received by ClearDrop'
+      };
     }
     
-    // Find if this step is in actual milestones
     const completedMilestone = milestones.find(m => m.statusName === stepName);
     
     if (completedMilestone) {
       const driver = getDriverById(completedMilestone.driverId);
       return {
         ...completedMilestone,
-        driverName: driver ? driver.name : 'Unknown Driver',
+        driverName: driver ? driver.name : 'ClearDrop Dispatcher',
         isCompleted: true,
-        isCurrent: index === milestones.length - 1 // Last completed is "current" state in sequence logic
+        isCurrent: milestones.findIndex(m => m.statusName === stepName) === milestones.length - 1,
+        description: stepName === 'Delivered' 
+          ? 'Package successfully handed to recipient' 
+          : `Processed at checkpoint by driver`
       };
     }
     
     return {
       statusName: stepName,
       isCompleted: false,
-      isCurrent: index === milestones.length && milestones.length > 0
+      isCurrent: milestones.length === index,
+      description: `Pending arrival at this milestone`
     };
   });
 
   return (
-    <div className="mobile-container" style={{ padding: '0' }}>
-      {/* Header Area */}
-      <div style={{ backgroundColor: 'var(--primary-color)', color: 'white', padding: '2rem 1.5rem', borderBottomLeftRadius: '24px', borderBottomRightRadius: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-          <Package size={24} />
-          <h1 style={{ fontSize: '1.25rem', margin: 0, fontWeight: '600' }}>Tracking Details</h1>
+    <div className="mobile-frame">
+      {/* Header Banner - Full Width rectangular */}
+      <div style={{ 
+        backgroundColor: 'var(--primary-color)', 
+        color: 'white', 
+        padding: '1.75rem 1.5rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Package size={20} />
+          <span style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9 }}>
+            Live Tracking
+          </span>
         </div>
         
-        <h2 style={{ fontSize: '1.75rem', margin: '0 0 0.5rem 0' }}>{parcel.trackingNumber}</h2>
+        <h2 style={{ fontSize: '1.5rem', margin: 0, fontWeight: '800', letterSpacing: '-0.01em' }}>
+          {parcel.trackingNumber}
+        </h2>
         
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', opacity: 0.9 }}>
-          <MapPin size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', opacity: 0.95, borderTop: '1px solid rgba(255, 255, 255, 0.15)', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
+          <MapPin size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
           <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: '1.4' }}>
-            To: {parcel.destination}
+            {parcel.destination}
           </p>
         </div>
       </div>
 
-      {/* Timeline Area */}
-      <div style={{ padding: '2rem 1.5rem' }}>
-        <h3 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)', fontSize: '1.125rem' }}>Status History</h3>
+      {/* Timeline Container */}
+      <div style={{ padding: '1.5rem', flex: 1, backgroundColor: 'var(--surface-color)' }}>
+        <h3 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)', fontSize: '1rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Delivery Progress
+        </h3>
         
         <div style={{ position: 'relative' }}>
-          {/* Vertical Line */}
-          <div style={{ 
-            position: 'absolute', 
-            left: '15px', 
-            top: '24px', 
-            bottom: '24px', 
-            width: '2px', 
-            backgroundColor: 'var(--border-color)',
-            zIndex: 0 
-          }} />
-
           {timeline.map((item, index) => {
-            // Hide "Pending Pickup" if they already started
-            if (index === 0 && item.isCompleted === false && milestones.length > 0) return null;
+            const isCompleted = item.isCompleted;
+            const isCurrent = item.isCurrent;
 
             return (
               <div key={item.statusName || index} style={{ 
                 display: 'flex', 
-                gap: '1.5rem', 
-                marginBottom: '2rem',
+                gap: '1.25rem', 
+                marginBottom: '2.25rem',
                 position: 'relative',
-                zIndex: 1,
-                opacity: item.isCompleted ? 1 : 0.5
+                zIndex: 1
               }}>
-                {/* Milestone Icon/Circle */}
+                {/* Connecting Line Segment */}
+                {index < timeline.length - 1 && (
+                  <div style={{
+                    position: 'absolute',
+                    left: '15px',
+                    top: '32px',
+                    bottom: '-36px',
+                    width: '2px',
+                    borderLeft: isCompleted && timeline[index + 1].isCompleted
+                      ? '2px solid var(--success)' 
+                      : '2px dashed var(--muted)',
+                    zIndex: 0
+                  }} />
+                )}
+
+                {/* Milestone Node (Circle) */}
                 <div style={{
                   width: '32px',
                   height: '32px',
                   borderRadius: '50%',
-                  backgroundColor: item.isCompleted ? 'var(--success)' : 'white',
-                  border: `2px solid ${item.isCompleted ? 'var(--success)' : 'var(--muted)'}`,
+                  backgroundColor: isCompleted ? 'var(--success)' : 'white',
+                  border: `2px solid ${isCompleted ? 'var(--success)' : isCurrent ? 'var(--primary-color)' : 'var(--muted)'}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  flexShrink: 0
+                  flexShrink: 0,
+                  zIndex: 2,
+                  boxShadow: isCurrent ? '0 0 0 5px rgba(5, 150, 105, 0.25)' : 'none',
+                  transition: 'box-shadow 0.3s ease'
                 }}>
-                  {item.isCompleted ? (
-                    <Check size={16} color="white" />
+                  {isCompleted ? (
+                    <Check size={16} color="white" strokeWidth={3} />
                   ) : (
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--muted)' }} />
+                    <div style={{ 
+                      width: '8px', 
+                      height: '8px', 
+                      borderRadius: '50%', 
+                      backgroundColor: isCurrent ? 'var(--primary-color)' : 'var(--muted)' 
+                    }} />
                   )}
                 </div>
 
                 {/* Milestone Content */}
-                <div style={{ flex: 1, paddingTop: '4px' }}>
-                  <h4 style={{ margin: '0 0 0.25rem 0', color: item.isCompleted ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                    {item.statusName}
-                  </h4>
+                <div style={{ flex: 1, paddingTop: '3px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <h4 style={{ 
+                      margin: 0, 
+                      color: isCompleted ? 'var(--text-primary)' : 'var(--text-secondary)',
+                      fontWeight: isCompleted || isCurrent ? '700' : '500',
+                      fontSize: '0.95rem'
+                    }}>
+                      {item.statusName}
+                    </h4>
+                    
+                    {isCurrent && (
+                      <span style={{ 
+                        fontSize: '0.65rem', 
+                        backgroundColor: 'var(--primary-light)', 
+                        color: 'var(--primary-hover)', 
+                        padding: '0.15rem 0.5rem', 
+                        borderRadius: '999px',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        Latest Update
+                      </span>
+                    )}
+                  </div>
                   
-                  {item.isCompleted && item.timestamp && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                        <Clock size={14} />
+                  <p style={{ margin: '0.25rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.8rem', lineHeight: '1.3' }}>
+                    {item.description}
+                  </p>
+                  
+                  {isCompleted && item.timestamp && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', marginTop: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                        <Clock size={12} />
                         <span>{format(new Date(item.timestamp), 'MMM d, yyyy h:mm a')}</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                        <User size={14} />
-                        <span>Handled by: <strong style={{ color: 'var(--text-primary)' }}>{item.driverName}</strong></span>
-                      </div>
+                      {item.driverName && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                          <User size={12} />
+                          <span>Logged by: <strong style={{ color: 'var(--text-primary)' }}>{item.driverName}</strong></span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -86,6 +86,33 @@ a {
   padding: 1rem;
 }
 
+.mobile-frame {
+  max-width: 450px;
+  width: 100%;
+  margin: 2rem auto;
+  background-color: var(--surface-color);
+  min-height: calc(100vh - 4rem);
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 601px) {
+  .mobile-frame {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 600px) {
+  .mobile-frame {
+    margin: 0;
+    min-height: 100vh;
+    border-radius: 0;
+  }
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
