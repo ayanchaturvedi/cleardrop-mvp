@@ -21,6 +21,8 @@ const CustomerTracking = () => {
   }
 
   const milestones = getMilestonesForParcel(parcelId);
+  const assignedDriver = getDriverById(parcel.currentDriverId);
+  const isDelivered = parcel.status === 'Delivered';
   
   // Build dynamic milestone sequence: prepending 'Pending Pickup'
   const MILESTONES_SEQUENCE = ['Pending Pickup', ...milestoneSequence];
@@ -88,6 +90,18 @@ const CustomerTracking = () => {
           <MapPin size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
           <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: '1.4' }}>
             {parcel.destination}
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: 0.95, borderTop: '1px solid rgba(255, 255, 255, 0.15)', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
+          <User size={16} style={{ flexShrink: 0 }} />
+          <p style={{ margin: 0, fontSize: '0.875rem' }}>
+            {isDelivered ? 'Delivered by: ' : 'Currently with: '}
+            {assignedDriver ? (
+              <strong>{assignedDriver.name} ({assignedDriver.vehicleNumber})</strong>
+            ) : (
+              <strong>Awaiting driver assignment</strong>
+            )}
           </p>
         </div>
       </div>
