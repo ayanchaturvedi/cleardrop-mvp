@@ -36,6 +36,19 @@ export const DatabaseProvider = ({ children }) => {
     return localStorage.getItem('cleardrop_auth') === 'true';
   });
 
+  // Admin User Profile State
+  const [adminUser, setAdminUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cleardrop_admin_user');
+      if (saved && saved !== 'undefined') {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Failed to parse admin user', e);
+    }
+    return null;
+  });
+
   // Drivers State
   const [drivers, setDrivers] = useState(() => {
     try {
@@ -94,6 +107,10 @@ export const DatabaseProvider = ({ children }) => {
   }, [isAuthenticated]);
 
   useEffect(() => {
+    localStorage.setItem('cleardrop_admin_user', adminUser ? JSON.stringify(adminUser) : 'undefined');
+  }, [adminUser]);
+
+  useEffect(() => {
     localStorage.setItem('cleardrop_drivers', JSON.stringify(drivers));
   }, [drivers]);
 
@@ -110,9 +127,10 @@ export const DatabaseProvider = ({ children }) => {
   }, [milestones]);
 
   // Auth Actions
-  const login = (email, password) => {
+  const login = (name, email, password) => {
     if (email === 'admin@cleardrop.com' && password === 'admin123') {
       setIsAuthenticated(true);
+      setAdminUser({ name: name || 'Admin User', email });
       return true;
     }
     return false;
@@ -120,6 +138,7 @@ export const DatabaseProvider = ({ children }) => {
 
   const logout = () => {
     setIsAuthenticated(false);
+    setAdminUser(null);
   };
 
   // Driver Actions
@@ -236,6 +255,7 @@ export const DatabaseProvider = ({ children }) => {
       milestones,
       milestoneSequence,
       isAuthenticated,
+      adminUser,
       login,
       logout,
       addDriver,

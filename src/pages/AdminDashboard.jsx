@@ -16,6 +16,7 @@ const AdminDashboard = () => {
     removeMilestoneStep,
     moveMilestoneStepUp,
     moveMilestoneStepDown,
+    adminUser,
     logout 
   } = useDatabase();
 
@@ -41,6 +42,16 @@ const AdminDashboard = () => {
 
   const activeParcels = parcels.filter(p => p.status !== 'Delivered');
   const deliveredParcels = parcels.filter(p => p.status === 'Delivered');
+
+  // Helpers
+  const getInitials = (name) => {
+    if (!name) return 'AD';
+    const parts = name.trim().split(' ');
+    if (parts.length > 1) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
 
   // Handlers
   const handleParcelChange = (e) => {
@@ -246,8 +257,12 @@ const AdminDashboard = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-              <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)' }}>Ayan Chaturvedi</span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>ayanchaturvedi09@gmail.com</span>
+              <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+                {adminUser?.name || 'Admin User'}
+              </span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {adminUser?.email || 'admin@cleardrop.com'}
+              </span>
             </div>
             <div style={{ 
               width: '36px', 
@@ -262,7 +277,7 @@ const AdminDashboard = () => {
               fontSize: '0.9rem',
               border: '2px solid var(--primary-light)'
             }}>
-              AC
+              {getInitials(adminUser?.name)}
             </div>
           </div>
 

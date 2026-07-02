@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useDatabase } from '../context/DatabaseContext';
-import { Package, Lock, Mail, AlertCircle } from 'lucide-react';
+import { Package, Lock, Mail, AlertCircle, User } from 'lucide-react';
 
 const Login = () => {
   const { login, isAuthenticated } = useDatabase();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -22,7 +23,7 @@ const Login = () => {
     e.preventDefault();
     setError('');
 
-    const success = login(email, password);
+    const success = login(name, email, password);
     if (success) {
       const origin = location.state?.from?.pathname || '/';
       navigate(origin);
@@ -94,6 +95,22 @@ const Login = () => {
 
         {/* Login Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
+              <User size={14} style={{ color: 'var(--text-secondary)' }} />
+              Admin Name
+            </label>
+            <input 
+              type="text" 
+              className="input-field" 
+              value={name} 
+              onChange={(e) => setName(e.target.value)} 
+              placeholder="e.g. Ayan Chaturvedi"
+              required 
+            />
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
               <Mail size={14} style={{ color: 'var(--text-secondary)' }} />
