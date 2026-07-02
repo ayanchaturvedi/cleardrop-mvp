@@ -3,16 +3,9 @@ import { useParams } from 'react-router-dom';
 import { useDatabase } from '../context/DatabaseContext';
 import { Camera, MapPin, Package as PackageIcon, CheckCircle2 } from 'lucide-react';
 
-const MILESTONES_SEQUENCE = [
-  'Confirm Pickup',
-  'Arrived at Transfer Hub',
-  'Out for Last-Mile',
-  'Delivered'
-];
-
 const DriverInterface = () => {
   const { parcelId } = useParams();
-  const { getParcelById, getDriverById, getMilestonesForParcel, addMilestone } = useDatabase();
+  const { getParcelById, getDriverById, getMilestonesForParcel, addMilestone, milestoneSequence } = useDatabase();
   const fileInputRef = useRef(null);
 
   const parcel = getParcelById(parcelId);
@@ -28,6 +21,9 @@ const DriverInterface = () => {
 
   const driver = getDriverById(parcel.currentDriverId);
   const milestones = getMilestonesForParcel(parcelId);
+  
+  // Use dynamic sequence from database context
+  const MILESTONES_SEQUENCE = milestoneSequence;
   
   let currentMilestoneIndex = -1;
   if (milestones.length > 0) {

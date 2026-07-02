@@ -4,17 +4,9 @@ import { useDatabase } from '../context/DatabaseContext';
 import { Package, Check, Clock, User, MapPin, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
-const MILESTONES_SEQUENCE = [
-  'Pending Pickup',
-  'Confirm Pickup',
-  'Arrived at Transfer Hub',
-  'Out for Last-Mile',
-  'Delivered'
-];
-
 const CustomerTracking = () => {
   const { parcelId } = useParams();
-  const { getParcelById, getMilestonesForParcel, getDriverById } = useDatabase();
+  const { getParcelById, getMilestonesForParcel, getDriverById, milestoneSequence } = useDatabase();
 
   const parcel = getParcelById(parcelId);
   
@@ -29,6 +21,9 @@ const CustomerTracking = () => {
   }
 
   const milestones = getMilestonesForParcel(parcelId);
+  
+  // Build dynamic milestone sequence: prepending 'Pending Pickup'
+  const MILESTONES_SEQUENCE = ['Pending Pickup', ...milestoneSequence];
   
   // Build tracking timeline list
   const timeline = MILESTONES_SEQUENCE.map((stepName, index) => {

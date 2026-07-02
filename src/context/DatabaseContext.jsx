@@ -4,11 +4,10 @@ const DatabaseContext = createContext();
 
 export const useDatabase = () => useContext(DatabaseContext);
 
-// Initial Mock Data
 const INITIAL_DRIVERS = [
-  { id: 'd1', name: 'Vikram Singh', phone: '+91 98765 43210' },
-  { id: 'd2', name: 'Rahul Sharma', phone: '+91 87654 32109' },
-  { id: 'd3', name: 'Amit Patel', phone: '+91 76543 21098' },
+  { id: 'd1', name: 'Vikram Singh', phone: '+91 98765 43210', vehicleNumber: 'DL-01-HA-9876' },
+  { id: 'd2', name: 'Rahul Sharma', phone: '+91 87654 32109', vehicleNumber: 'MH-02-AB-1234' },
+  { id: 'd3', name: 'Amit Patel', phone: '+91 76543 21098', vehicleNumber: 'KA-03-XY-5678' },
 ];
 
 const INITIAL_PARCELS = [
@@ -24,13 +23,46 @@ const INITIAL_PARCELS = [
   }
 ];
 
-const INITIAL_MILESTONES = [
-  // Example initial milestone if needed, but starting empty or with one is fine
+const DEFAULT_MILESTONES_SEQUENCE = [
+  'Confirm Pickup',
+  'Arrived at Transfer Hub',
+  'Out for Last-Mile',
+  'Delivered'
 ];
 
 export const DatabaseProvider = ({ children }) => {
-  const [drivers] = useState(INITIAL_DRIVERS);
-  
+  // Auth state
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('cleardrop_auth') === 'true';
+  });
+
+  // Drivers State
+  const [drivers, setDrivers] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cleardrop_drivers');
+      if (saved && saved !== 'undefined') {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Failed to parse drivers', e);
+    }
+    return INITIAL_DRIVERS;
+  });
+
+  // Milestone Sequence State
+  const [milestoneSequence, setMilestoneSequence] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cleardrop_milestone_sequence');
+      if (saved && saved !== 'undefined') {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Failed to parse milestones sequence', e);
+    }
+    return DEFAULT_MILESTONES_SEQUENCE;
+  });
+
+  // Parcels State
   const [parcels, setParcels] = useState(() => {
     try {
       const saved = localStorage.getItem('cleardrop_parcels');
@@ -38,11 +70,12 @@ export const DatabaseProvider = ({ children }) => {
         return JSON.parse(saved);
       }
     } catch (e) {
-      console.error('Failed to parse parcels from local storage', e);
+      console.error('Failed to parse parcels', e);
     }
     return INITIAL_PARCELS;
   });
-  
+
+  // Milestone Logs State
   const [milestones, setMilestones] = useState(() => {
     try {
       const saved = localStorage.getItem('cleardrop_milestones');
@@ -50,16 +83,109 @@ export const DatabaseProvider = ({ children }) => {
         return JSON.parse(saved);
       }
     } catch (e) {
-      console.error('Failed to parse milestones from local storage', e);
+      console.error('Failed to parse milestones logs', e);
     }
-    return INITIAL_MILESTONES;
+    return [];
   });
+
+  // Sync state to local storage
+  useEffect(() => {
+    localStorage.setItem('cleardrop_auth', isAuthenticated);
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    localStorage.setItem('cleardrop_drivers', JSON.stringify(drivers));
+  }, [drivers]);
+
+  useEffect(() => {
+    localStorage.setItem('cleardrop_milestone_sequence', JSON.stringify(milestoneSequence));
+  }, [milestoneSequence]);
 
   useEffect(() => {
     localStorage.setItem('cleardrop_parcels', JSON.stringify(parcels));
-    localStorage.setItem('cleardrop_milestones', JSON.stringify(milestones));
-  }, [parcels, milestones]);
+  }, [parcels]);
 
+  useEffect(() => {
+    localStorage.setItem('cleardrop_milestones', JSON.stringify(milestones));
+  }, [milestones]);
+
+  // Auth Actions
+  const login = (email, password) => {
+    if (email === 'admin@cleardrop.com' && password === 'admin123') {
+      setIsAuthenticated(true);
+      return true;
+    }
+    return false;
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+  };
+
+  // Driver Actions
+  const addDriver = (driverData) => {
+    const newDriver = {
+      ...driverData,
+      id: `d${Date.now()}`
+    };
+    setDrivers(prev => [...prev, newDriver]);
+  };
+
+  const removeDriver = (driverId) => {
+    setDrivers(prev => prev.filter(d => d.id !== driverId));
+    // If a parcel is assigned to this driver, reset its currentDriverId
+    setParcels(prev => prev.map(p => 
+      p.currentDriverId === driverId ? { ...p, currentDriverId: null } : p
+    ));
+  };
+
+  // Milestone Sequence Actions
+  const addMilestoneStep = (stepName) => {
+    if (milestoneSequence.includes(stepName)) return false;
+    
+    // Add right before "Delivered" to ensure "Delivered" stays last
+    setMilestoneSequence(prev => {
+      const newSeq = [...prev];
+      const deliveredIdx = newSeq.indexOf('Delivered');
+      if (deliveredIdx !== -1) {
+        newSeq.splice(deliveredIdx, 0, stepName);
+      } else {
+        newSeq.push(stepName);
+      }
+      return newSeq;
+    });
+    return true;
+  };
+
+  const removeMilestoneStep = (stepName) => {
+    if (stepName === 'Delivered') return false; // Prevent removing delivered
+    setMilestoneSequence(prev => prev.filter(s => s !== stepName));
+    return true;
+  };
+
+  const moveMilestoneStepUp = (index) => {
+    if (index <= 0 || index >= milestoneSequence.length - 1) return; // Prevent moving first step up or Delivered step
+    setMilestoneSequence(prev => {
+      const newSeq = [...prev];
+      const temp = newSeq[index];
+      newSeq[index] = newSeq[index - 1];
+      newSeq[index - 1] = temp;
+      return newSeq;
+    });
+  };
+
+  const moveMilestoneStepDown = (index) => {
+    if (index < 0 || index >= milestoneSequence.length - 2) return; // Prevent moving Delivered step or the step right before it down
+    setMilestoneSequence(prev => {
+      const newSeq = [...prev];
+      const temp = newSeq[index];
+      newSeq[index] = newSeq[index + 1];
+      newSeq[index + 1] = temp;
+      return newSeq;
+    });
+  };
+
+  // Parcel Actions
   const createParcel = (parcelData) => {
     const newParcel = {
       ...parcelData,
@@ -84,12 +210,11 @@ export const DatabaseProvider = ({ children }) => {
       statusName,
       driverId,
       timestamp: new Date().toISOString(),
-      imageUrl, // Optional for proof of delivery
+      imageUrl,
     };
     
     setMilestones(prev => [...prev, newMilestone]);
     
-    // Update parcel's current status for quick reference
     setParcels(prev => prev.map(p => 
       p.id === parcelId ? { ...p, status: statusName } : p
     ));
@@ -109,6 +234,16 @@ export const DatabaseProvider = ({ children }) => {
       drivers,
       parcels,
       milestones,
+      milestoneSequence,
+      isAuthenticated,
+      login,
+      logout,
+      addDriver,
+      removeDriver,
+      addMilestoneStep,
+      removeMilestoneStep,
+      moveMilestoneStepUp,
+      moveMilestoneStepDown,
       createParcel,
       assignDriver,
       addMilestone,
