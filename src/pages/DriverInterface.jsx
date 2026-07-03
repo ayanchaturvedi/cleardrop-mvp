@@ -21,7 +21,9 @@ const DriverInterface = () => {
 
   const [showDelaySelect, setShowDelaySelect] = useState(false);
   const [selectedReason, setSelectedReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
   const [showScanModal, setShowScanModal] = useState(false);
+  const [showHandoffQr, setShowHandoffQr] = useState(false);
 
   const parcel = getParcelById(parcelId);
 
@@ -35,6 +37,17 @@ const DriverInterface = () => {
     }
   }, [parcelId, parcel]);
 
+  const milestones = getMilestonesForParcel(parcelId);
+  const lastMilestone = milestones[milestones.length - 1];
+  const isTransferred = lastMilestone?.statusName.startsWith('Package successfully transferred');
+
+  // Automatically show QR code when arriving at Transfer Hub
+  useEffect(() => {
+    if (parcel?.status === 'Arrived at Transfer Hub' && !isTransferred) {
+      setShowHandoffQr(true);
+    }
+  }, [parcel?.status]);
+
   if (!parcel) {
     return (
       <div className="mobile-frame" style={{ justifyContent: 'center', alignItems: 'center', padding: '2rem', textAlign: 'center' }}>
@@ -46,7 +59,6 @@ const DriverInterface = () => {
 
   const activeDriver = getDriverById(parcel.currentDriverId);
   const simulatedDriver = getDriverById(selectedDriverId);
-  const milestones = getMilestonesForParcel(parcelId);
 
   const isAssignedViewing = selectedDriverId === parcel.currentDriverId;
 
@@ -63,11 +75,6 @@ const DriverInterface = () => {
   }
   const nextMilestone = MILESTONES_SEQUENCE[currentMilestoneIndex + 1];
   const isDelivered = currentMilestoneIndex === MILESTONES_SEQUENCE.length - 1;
-
-  // Handoff QR visibility conditions
-  const lastMilestone = milestones[milestones.length - 1];
-  const isTransferred = lastMilestone?.statusName.startsWith('Package successfully transferred');
-  const showQrCode = parcel.status === 'Arrived at Transfer Hub' && !isTransferred;
 
   const handleMilestoneClick = (statusName) => {
     if (!activeDriver) {
@@ -218,10 +225,35 @@ const DriverInterface = () => {
               </p>
             </div>
           </div>
+
+          {/* Flexible "Hand Off Package" Button inside the card - accessible anywhere */}
+          {isAssignedViewing && !isDelivered && (
+            <button 
+              className="btn btn-secondary" 
+              style={{ 
+                width: '100%', 
+                marginTop: '1rem', 
+                borderColor: 'var(--primary-color)',
+                color: 'var(--primary-color)',
+                fontWeight: '700',
+                minHeight: '40px',
+                fontSize: '0.9rem',
+                gap: '0.4rem'
+              }}
+              onClick={() => {
+                setShowHandoffQr(!showHandoffQr);
+                if (showHandoffQr) {
+                  // clear isTransferred state by setting it false, just toggle
+                }
+              }}
+            >
+              🔄 Hand Off Package
+            </button>
+          )}
         </div>
 
-        {/* Handoff QR Code Generator view for active driver */}
-        {showQrCode && isAssignedViewing && (
+        {/* Handoff QR Code Card */}
+        {showHandoffQr && isAssignedViewing && !isDelivered && (
           <div className="card" style={{ 
             display: 'flex', 
             flexDirection: 'column', 
@@ -230,8 +262,15 @@ const DriverInterface = () => {
             border: '2px dashed var(--primary-color)', 
             padding: '1.25rem', 
             backgroundColor: '#f0fdf4',
-            boxShadow: 'var(--shadow-sm)'
+            boxShadow: 'var(--shadow-sm)',
+            position: 'relative'
           }}>
+            <button 
+              style={{ position: 'absolute', top: '8px', right: '12px', fontSize: '1.25rem', color: 'var(--text-secondary)', cursor: 'pointer' }}
+              onClick={() => setShowHandoffQr(false)}
+            >
+              ×
+            </button>
             <h3 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--primary-hover)', fontWeight: '700' }}>Handoff QR Code</h3>
             <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', lineHeight: '1.3' }}>
               Show this QR code to the incoming driver to complete the transfer.
@@ -248,7 +287,7 @@ const DriverInterface = () => {
         )}
 
         {/* Handoff QR Code Scanner view for incoming driver */}
-        {showQrCode && !isAssignedViewing && (
+        {!isAssignedViewing && !isDelivered && (
           <div className="card" style={{ 
             display: 'flex', 
             flexDirection: 'column', 
@@ -259,7 +298,7 @@ const DriverInterface = () => {
             backgroundColor: '#f8fafc'
           }}>
             <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-              This parcel is at the transfer hub. Switch driver or scan QR code to accept the handoff.
+              You are not the assigned driver. Scan QR code to accept the handoff.
             </p>
             <button 
               className="btn btn-primary"
@@ -349,25 +388,47 @@ const DriverInterface = () => {
                       className="input-field" 
                       style={{ minHeight: '36px', padding: '0.25rem 0.5rem', fontSize: '0.9rem', borderColor: '#fcd34d' }}
                       value={selectedReason}
-                      onChange={(e) => setSelectedReason(e.target.value)}
+                      onChange={(e) => {
+                        setSelectedReason(e.target.value);
+                        if (e.target.value !== 'Other') {
+                          setCustomReason('');
+                        }
+                      }}
                     >
                       <option value="" disabled>-- Choose Reason --</option>
                       <option value="Traffic Delay">Traffic Delay</option>
                       <option value="Weather Exception">Weather Exception</option>
                       <option value="Vehicle Breakdown">Vehicle Breakdown</option>
                       <option value="Customer Unavailable">Customer Unavailable</option>
+                      <option value="Other">Other</option>
                     </select>
+
+                    {/* Conditional input field for custom 'Other' delay reason */}
+                    {selectedReason === 'Other' && (
+                      <textarea
+                        className="input-field"
+                        style={{ minHeight: '60px', padding: '0.5rem 0.75rem', fontSize: '0.9rem', borderColor: '#fcd34d', resize: 'vertical' }}
+                        placeholder="Please specify reason..."
+                        value={customReason}
+                        onChange={(e) => setCustomReason(e.target.value)}
+                        required
+                      />
+                    )}
+
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button 
                         className="btn btn-primary" 
                         style={{ flex: 1, minHeight: '36px', fontSize: '0.85rem', backgroundColor: '#d97706', color: 'white' }}
                         onClick={() => {
-                          if (!selectedReason) return;
-                          logDelay(parcelId, selectedReason, simulatedDriver.id);
+                          const reasonToLog = selectedReason === 'Other' ? customReason : selectedReason;
+                          if (!reasonToLog.trim()) return;
+
+                          logDelay(parcelId, reasonToLog, simulatedDriver.id);
                           setShowDelaySelect(false);
                           setSelectedReason('');
+                          setCustomReason('');
                         }}
-                        disabled={!selectedReason}
+                        disabled={!selectedReason || (selectedReason === 'Other' && !customReason.trim())}
                       >
                         Submit
                       </button>
@@ -377,6 +438,7 @@ const DriverInterface = () => {
                         onClick={() => {
                           setShowDelaySelect(false);
                           setSelectedReason('');
+                          setCustomReason('');
                         }}
                       >
                         Cancel
@@ -471,6 +533,7 @@ const DriverInterface = () => {
                   if (!simulatedDriver) return;
                   transferParcel(parcel.id, simulatedDriver.id, simulatedDriver.name);
                   setShowScanModal(false);
+                  setShowHandoffQr(false); // Close QR code card after successful scan
                 }}
               >
                 Simulate Scan Success
