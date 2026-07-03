@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 
 const CustomerTracking = () => {
   const { parcelId } = useParams();
-  const { getParcelById, getMilestonesForParcel, getDriverById, milestoneSequence } = useDatabase();
+  const { getParcelById, getMilestonesForParcel, getDriverById, milestoneSequence, branding } = useDatabase();
 
   const parcel = getParcelById(parcelId);
   
@@ -25,7 +25,7 @@ const CustomerTracking = () => {
   const isDelivered = parcel.status === 'Delivered';
   
   // Call fallback office number if no driver assigned
-  const supportPhone = '+91 1800 123 4567';
+  const supportPhone = branding.supportPhone || '+91 1800 123 4567';
   const rawPhoneNumber = assignedDriver ? assignedDriver.phone : supportPhone;
   const dialPhoneNumber = rawPhoneNumber.replace(/\s+/g, '');
 
@@ -101,9 +101,13 @@ const CustomerTracking = () => {
         gap: '0.75rem'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Package size={20} />
+          {branding.logoUrl ? (
+            <img src={branding.logoUrl} style={{ height: '20px', width: 'auto', maxHeight: '20px', objectFit: 'contain', borderRadius: '2px' }} alt="Brand Logo" />
+          ) : (
+            <Package size={20} />
+          )}
           <span style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9 }}>
-            Live Tracking
+            {branding.companyName} Tracking
           </span>
         </div>
         
@@ -176,7 +180,7 @@ const CustomerTracking = () => {
           }}
         >
           <span>📞</span>
-          <span>{assignedDriver ? `Call Carrier (${assignedDriver.name})` : 'Contact Support Office'}</span>
+          <span>{assignedDriver ? `Call Carrier (${assignedDriver.name})` : `Contact Support (${branding.companyName})`}</span>
         </a>
 
         <h3 style={{ color: 'var(--text-primary)', fontSize: '1rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>

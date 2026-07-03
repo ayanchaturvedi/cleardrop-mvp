@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDatabase } from '../context/DatabaseContext';
-import { Package, Users, Share2, Copy, Check, Trash2, CheckCircle, User, Phone, MapPin, ClipboardList, LogOut, Settings, ArrowUp, ArrowDown, Plus } from 'lucide-react';
+import { Package, Users, Share2, Copy, Check, Trash2, CheckCircle, User, Phone, MapPin, ClipboardList, LogOut, Settings, ArrowUp, ArrowDown, Plus, Upload, Building } from 'lucide-react';
 
 const AdminDashboard = () => {
   const { 
@@ -17,11 +17,13 @@ const AdminDashboard = () => {
     moveMilestoneStepUp,
     moveMilestoneStepDown,
     adminUser,
+    branding,
+    updateBranding,
     logout 
   } = useDatabase();
 
   const [copiedId, setCopiedId] = useState(null);
-  const [activeTab, setActiveTab] = useState('parcels'); // 'parcels' | 'drivers' | 'milestones'
+  const [activeTab, setActiveTab] = useState('parcels'); // 'parcels' | 'drivers' | 'milestones' | 'settings'
 
   // Forms State
   const [parcelForm, setParcelForm] = useState({
@@ -37,8 +39,24 @@ const AdminDashboard = () => {
     vehicleNumber: ''
   });
 
+  const [settingsForm, setSettingsForm] = useState({
+    companyName: branding.companyName,
+    supportPhone: branding.supportPhone,
+    logoUrl: branding.logoUrl
+  });
+
   const [newMilestoneName, setNewMilestoneName] = useState('');
   const [milestoneError, setMilestoneError] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Sync settings form state when database branding updates
+  useEffect(() => {
+    setSettingsForm({
+      companyName: branding.companyName,
+      supportPhone: branding.supportPhone,
+      logoUrl: branding.logoUrl
+    });
+  }, [branding]);
 
   const activeParcels = parcels.filter(p => p.status !== 'Delivered');
   const deliveredParcels = parcels.filter(p => p.status === 'Delivered');
@@ -100,13 +118,35 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleSettingsChange = (e) => {
+    setSettingsForm({ ...settingsForm, [e.target.name]: e.target.value });
+  };
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSettingsForm(prev => ({ ...prev, logoUrl: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveSettings = (e) => {
+    e.preventDefault();
+    updateBranding(settingsForm);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
   const handleShare = async (parcelId, type) => {
     const url = `${window.location.origin}/${type}/${parcelId}`;
     
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `ClearDrop ${type === 'track' ? 'Tracking' : 'Driver'} Link`,
+          title: `${branding.companyName} ${type === 'track' ? 'Tracking' : 'Driver'} Link`,
           text: `Here is the ${type} link for parcel ${parcelId}`,
           url: url,
         });
@@ -236,10 +276,14 @@ const AdminDashboard = () => {
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <Package size={24} color="var(--primary-color)" />
+            {branding.logoUrl ? (
+              <img src={branding.logoUrl} style={{ height: '24px', width: 'auto', maxHeight: '24px', objectFit: 'contain', borderRadius: '4px' }} alt="Brand Logo" />
+            ) : (
+              <Package size={24} color="var(--primary-color)" />
+            )}
           </div>
           <span style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--primary-color)', letterSpacing: '-0.02em' }}>
-            ClearDrop
+            {branding.companyName}
           </span>
           <span style={{ 
             fontSize: '0.75rem', 
@@ -347,9 +391,22 @@ const AdminDashboard = () => {
           >
             Milestone Settings
           </button>
+          <button 
+            onClick={() => setActiveTab('settings')} 
+            style={{ 
+              padding: '0.75rem 1.25rem', 
+              borderBottom: activeTab === 'settings' ? '3px solid var(--primary-color)' : '3px solid transparent', 
+              fontWeight: '700', 
+              fontSize: '0.95rem',
+              color: activeTab === 'settings' ? 'var(--primary-color)' : 'var(--text-secondary)',
+              transition: 'all 0.2s'
+            }}
+          >
+            Organization Settings
+          </button>
         </div>
 
-        {/* Tab content rendering */}
+        {/* Tab 1: Parcels */}
         {activeTab === 'parcels' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem', alignItems: 'start' }}>
             {/* Create Parcel Form */}
@@ -644,6 +701,108 @@ const AdminDashboard = () => {
                 })}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Tab 4: Organization Settings */}
+        {activeTab === 'settings' && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem', alignItems: 'start' }}>
+            
+            {/* Branding form */}
+            <div className="card" style={{ boxShadow: 'var(--shadow-md)' }}>
+              <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Building size={20} color="var(--primary-color)" /> Branding Details
+              </h2>
+
+              {saveSuccess && (
+                <div style={{ color: 'var(--primary-hover)', fontSize: '0.85rem', marginBottom: '1rem', backgroundColor: 'var(--primary-light)', padding: '0.5rem 0.75rem', borderRadius: '4px', fontWeight: '600' }}>
+                  ✓ Settings saved successfully!
+                </div>
+              )}
+
+              <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <label className="label">Company Name</label>
+                  <input 
+                    className="input-field" 
+                    name="companyName" 
+                    value={settingsForm.companyName} 
+                    onChange={handleSettingsChange} 
+                    placeholder="e.g. ClearDrop Logistics" 
+                    required 
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <label className="label">Support Phone Number</label>
+                  <input 
+                    className="input-field" 
+                    name="supportPhone" 
+                    value={settingsForm.supportPhone} 
+                    onChange={handleSettingsChange} 
+                    placeholder="e.g. +91 1800 123 4567" 
+                    required 
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <label className="label">Brand Logo (Direct Image URL)</label>
+                  <input 
+                    className="input-field" 
+                    name="logoUrl" 
+                    value={settingsForm.logoUrl} 
+                    onChange={handleSettingsChange} 
+                    placeholder="e.g. https://domain.com/logo.png" 
+                  />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', margin: '0.5rem 0' }}>— OR —</span>
+                  
+                  <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', border: '1px dashed var(--border-color)', padding: '0.75rem', borderRadius: 'var(--border-radius-md)', cursor: 'pointer', justifyContent: 'center', backgroundColor: '#f8fafc' }}>
+                    <Upload size={16} style={{ color: 'var(--text-secondary)' }} />
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Upload Logo Image File</span>
+                    <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+                  </label>
+                </div>
+
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', fontWeight: '700', marginTop: '0.5rem' }}>
+                  Save Settings
+                </button>
+              </form>
+            </div>
+
+            {/* Live Branding Preview */}
+            <div className="card" style={{ boxShadow: 'var(--shadow-md)' }}>
+              <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                Branding Preview
+              </h2>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                This is a live preview of how your brand details will render across all user dashboards.
+              </p>
+
+              <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--border-radius-lg)', overflow: 'hidden' }}>
+                {/* Header Preview */}
+                <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--border-color)', backgroundColor: 'white', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ backgroundColor: 'var(--primary-light)', padding: '0.4rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {settingsForm.logoUrl ? (
+                      <img src={settingsForm.logoUrl} style={{ height: '20px', width: 'auto', maxHeight: '20px', objectFit: 'contain', borderRadius: '2px' }} alt="Brand Logo" />
+                    ) : (
+                      <Package size={20} color="var(--primary-color)" />
+                    )}
+                  </div>
+                  <span style={{ fontSize: '1.05rem', fontWeight: '800', color: 'var(--primary-color)', letterSpacing: '-0.02em' }}>
+                    {settingsForm.companyName || 'ClearDrop'}
+                  </span>
+                </div>
+
+                {/* Info Preview */}
+                <div style={{ padding: '1.25rem', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    Support Contact Number: <strong>{settingsForm.supportPhone || '+91 1800 123 4567'}</strong>
+                  </span>
+                </div>
+              </div>
+            </div>
+
           </div>
         )}
 

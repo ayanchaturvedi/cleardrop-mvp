@@ -5,7 +5,7 @@ import { Camera, MapPin, Package as PackageIcon, CheckCircle2 } from 'lucide-rea
 
 const DriverInterface = () => {
   const { parcelId } = useParams();
-  const { getParcelById, getDriverById, getMilestonesForParcel, addMilestone, logDelay, milestoneSequence } = useDatabase();
+  const { getParcelById, getDriverById, getMilestonesForParcel, addMilestone, logDelay, milestoneSequence, branding } = useDatabase();
   const fileInputRef = useRef(null);
 
   const [showDelaySelect, setShowDelaySelect] = useState(false);
@@ -59,10 +59,26 @@ const DriverInterface = () => {
       <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1 }}>
         
         {/* Header */}
-        <header style={{ textAlign: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-          <h1 style={{ fontSize: '1.25rem', color: 'var(--text-primary)', marginBottom: '0.25rem', fontWeight: '800' }}>
-            Driver Console
-          </h1>
+        <header style={{ 
+          textAlign: 'center', 
+          borderBottom: '1px solid var(--border-color)', 
+          paddingBottom: '1rem',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+            {branding.logoUrl ? (
+              <img src={branding.logoUrl} style={{ height: '20px', width: 'auto', maxHeight: '20px', objectFit: 'contain', borderRadius: '2px' }} alt="Brand Logo" />
+            ) : (
+              <PackageIcon size={20} color="var(--primary-color)" />
+            )}
+            <span style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--primary-color)', letterSpacing: '-0.01em' }}>
+              {branding.companyName}
+            </span>
+          </div>
+
           {driver ? (
             <span style={{ 
               display: 'inline-block',

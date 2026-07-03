@@ -30,6 +30,12 @@ const DEFAULT_MILESTONES_SEQUENCE = [
   'Delivered'
 ];
 
+const DEFAULT_BRANDING = {
+  companyName: 'ClearDrop',
+  supportPhone: '+91 1800 123 4567',
+  logoUrl: '' // Base64 or standard URL
+};
+
 export const DatabaseProvider = ({ children }) => {
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -47,6 +53,19 @@ export const DatabaseProvider = ({ children }) => {
       console.error('Failed to parse admin user', e);
     }
     return null;
+  });
+
+  // White-Label Branding State
+  const [branding, setBranding] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cleardrop_branding');
+      if (saved && saved !== 'undefined') {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Failed to parse branding settings', e);
+    }
+    return DEFAULT_BRANDING;
   });
 
   // Drivers State
@@ -111,6 +130,10 @@ export const DatabaseProvider = ({ children }) => {
   }, [adminUser]);
 
   useEffect(() => {
+    localStorage.setItem('cleardrop_branding', JSON.stringify(branding));
+  }, [branding]);
+
+  useEffect(() => {
     localStorage.setItem('cleardrop_drivers', JSON.stringify(drivers));
   }, [drivers]);
 
@@ -139,6 +162,10 @@ export const DatabaseProvider = ({ children }) => {
   const logout = () => {
     setIsAuthenticated(false);
     setAdminUser(null);
+  };
+
+  const updateBranding = (newBranding) => {
+    setBranding(prev => ({ ...prev, ...newBranding }));
   };
 
   // Driver Actions
@@ -275,8 +302,10 @@ export const DatabaseProvider = ({ children }) => {
       milestoneSequence,
       isAuthenticated,
       adminUser,
+      branding,
       login,
       logout,
+      updateBranding,
       addDriver,
       removeDriver,
       addMilestoneStep,
