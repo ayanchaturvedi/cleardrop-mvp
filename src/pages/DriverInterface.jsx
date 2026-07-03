@@ -155,7 +155,7 @@ const DriverInterface = () => {
           gap: '0.25rem'
         }}>
           <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Simulate Session As:
+            Current Handler:
           </label>
           <select 
             className="input-field"

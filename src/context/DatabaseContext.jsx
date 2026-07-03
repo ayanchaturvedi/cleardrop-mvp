@@ -150,13 +150,63 @@ export const DatabaseProvider = ({ children }) => {
   }, [milestones]);
 
   // Auth Actions
-  const login = (name, email, password) => {
+  const login = (email, password) => {
+    // Check default mock admin
     if (email === 'admin@cleardrop.com' && password === 'admin123') {
       setIsAuthenticated(true);
-      setAdminUser({ name: name || 'Admin User', email });
+      setAdminUser({ name: 'Admin User', email });
       return true;
     }
+
+    // Check registered admins from local storage
+    try {
+      const registered = localStorage.getItem('cleardrop_registered_admins');
+      if (registered) {
+        const adminsList = JSON.parse(registered);
+        const match = adminsList.find(a => a.email === email && a.password === password);
+        if (match) {
+          setIsAuthenticated(true);
+          setAdminUser({ name: match.name, email: match.email });
+          return true;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to read registered admins', e);
+    }
+    
     return false;
+  };
+
+  const signUp = (name, email, password, orgName, orgLogo) => {
+    try {
+      const registered = localStorage.getItem('cleardrop_registered_admins');
+      const adminsList = registered ? JSON.parse(registered) : [];
+      
+      // Prevent duplicates
+      if (adminsList.some(a => a.email === email)) {
+        return false;
+      }
+
+      const newAdmin = { name, email, password };
+      adminsList.push(newAdmin);
+      localStorage.setItem('cleardrop_registered_admins', JSON.stringify(adminsList));
+      
+      setIsAuthenticated(true);
+      setAdminUser({ name, email });
+
+      // Update global branding instantly
+      const newBranding = {};
+      if (orgName) newBranding.companyName = orgName;
+      if (orgLogo) newBranding.logoUrl = orgLogo;
+      if (Object.keys(newBranding).length > 0) {
+        updateBranding(newBranding);
+      }
+
+      return true;
+    } catch (e) {
+      console.error('Failed to sign up', e);
+      return false;
+    }
   };
 
   const logout = () => {
@@ -322,6 +372,7 @@ export const DatabaseProvider = ({ children }) => {
       adminUser,
       branding,
       login,
+      signUp,
       logout,
       updateBranding,
       addDriver,
