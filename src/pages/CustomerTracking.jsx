@@ -24,6 +24,11 @@ const CustomerTracking = () => {
   const assignedDriver = getDriverById(parcel.currentDriverId);
   const isDelivered = parcel.status === 'Delivered';
   
+  // Call fallback office number if no driver assigned
+  const supportPhone = '+91 1800 123 4567';
+  const rawPhoneNumber = assignedDriver ? assignedDriver.phone : supportPhone;
+  const dialPhoneNumber = rawPhoneNumber.replace(/\s+/g, '');
+
   // Build dynamic milestone sequence: prepending 'Pending Pickup'
   const MILESTONES_SEQUENCE = ['Pending Pickup', ...milestoneSequence];
   
@@ -107,8 +112,33 @@ const CustomerTracking = () => {
       </div>
 
       {/* Timeline Container */}
-      <div style={{ padding: '1.5rem', flex: 1, backgroundColor: 'var(--surface-color)' }}>
-        <h3 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)', fontSize: '1rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+      <div style={{ padding: '1.5rem', flex: 1, backgroundColor: 'var(--surface-color)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        
+        {/* Call Carrier Action Button */}
+        <a 
+          href={`tel:${dialPhoneNumber}`} 
+          className="btn btn-secondary" 
+          style={{ 
+            width: '100%', 
+            borderColor: 'var(--primary-color)', 
+            color: 'var(--primary-color)',
+            fontWeight: '700',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            textDecoration: 'none',
+            boxShadow: 'var(--shadow-sm)',
+            minHeight: '48px',
+            backgroundColor: 'white',
+            borderRadius: 'var(--border-radius-md)'
+          }}
+        >
+          <span>📞</span>
+          <span>{assignedDriver ? `Call Carrier (${assignedDriver.name})` : 'Contact Support Office'}</span>
+        </a>
+
+        <h3 style={{ color: 'var(--text-primary)', fontSize: '1rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
           Delivery Progress
         </h3>
         
