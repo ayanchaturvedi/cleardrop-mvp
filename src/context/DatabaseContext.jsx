@@ -285,6 +285,24 @@ export const DatabaseProvider = ({ children }) => {
     ));
   };
 
+  const transferParcel = (parcelId, newDriverId, newDriverName) => {
+    const transferStatus = `Package successfully transferred to ${newDriverName}`;
+    const newMilestone = {
+      id: `m${Date.now()}`,
+      parcelId,
+      statusName: transferStatus,
+      driverId: newDriverId,
+      timestamp: new Date().toISOString(),
+      isTransfer: true
+    };
+    
+    setMilestones(prev => [...prev, newMilestone]);
+    
+    setParcels(prev => prev.map(p => 
+      p.id === parcelId ? { ...p, currentDriverId: newDriverId } : p
+    ));
+  };
+
   const deleteParcel = (parcelId) => {
     setParcels(prev => prev.filter(p => p.id !== parcelId));
     setMilestones(prev => prev.filter(m => m.parcelId !== parcelId));
@@ -316,6 +334,7 @@ export const DatabaseProvider = ({ children }) => {
       assignDriver,
       addMilestone,
       logDelay,
+      transferParcel,
       deleteParcel,
       getParcelById,
       getMilestonesForParcel,

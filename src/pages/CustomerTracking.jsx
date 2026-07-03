@@ -36,6 +36,8 @@ const CustomerTracking = () => {
   const completedTimelineItems = milestones.map(m => {
     const driver = getDriverById(m.driverId);
     const isDelay = m.isDelay || m.statusName.startsWith('Delay:');
+    const isTransfer = m.isTransfer || m.statusName.startsWith('Package successfully transferred');
+    
     return {
       statusName: m.statusName,
       isCompleted: true,
@@ -43,9 +45,12 @@ const CustomerTracking = () => {
       timestamp: m.timestamp,
       driverName: driver ? driver.name : 'ClearDrop Dispatcher',
       isDelay,
+      isTransfer,
       description: isDelay 
         ? `Parcel delayed: ${m.delayReason || m.statusName.replace('Delay: ', '')}` 
-        : (m.statusName === 'Delivered' ? 'Package successfully handed to recipient' : 'Processed at checkpoint by driver')
+        : isTransfer
+          ? `Package custody successfully transferred to ${driver ? driver.name : 'new driver'}`
+          : (m.statusName === 'Delivered' ? 'Package successfully handed to recipient' : 'Processed at checkpoint by driver')
     };
   });
 
