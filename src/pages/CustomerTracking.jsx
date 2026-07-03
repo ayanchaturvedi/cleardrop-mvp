@@ -31,43 +31,63 @@ const CustomerTracking = () => {
 
   // Build dynamic milestone sequence: prepending 'Pending Pickup'
   const MILESTONES_SEQUENCE = ['Pending Pickup', ...milestoneSequence];
-  
-  // Build tracking timeline list
-  const timeline = MILESTONES_SEQUENCE.map((stepName, index) => {
-    if (index === 0) {
-      // Pending Pickup is completed if there are any milestones logged at all
-      const isCompleted = milestones.length > 0;
-      return {
-        statusName: stepName,
-        isCompleted,
-        isCurrent: milestones.length === 0, // Current if nothing else is logged
-        timestamp: isCompleted && milestones[0] ? milestones[0].timestamp : null,
-        description: 'Order details received by ClearDrop'
-      };
-    }
-    
-    const completedMilestone = milestones.find(m => m.statusName === stepName);
-    
-    if (completedMilestone) {
-      const driver = getDriverById(completedMilestone.driverId);
-      return {
-        ...completedMilestone,
-        driverName: driver ? driver.name : 'ClearDrop Dispatcher',
-        isCompleted: true,
-        isCurrent: milestones.findIndex(m => m.statusName === stepName) === milestones.length - 1,
-        description: stepName === 'Delivered' 
-          ? 'Package successfully handed to recipient' 
-          : `Processed at checkpoint by driver`
-      };
-    }
-    
+
+  // Build timeline items chronologically
+  const completedTimelineItems = milestones.map(m => {
+    const driver = getDriverById(m.driverId);
+    const isDelay = m.isDelay || m.statusName.startsWith('Delay:');
     return {
-      statusName: stepName,
-      isCompleted: false,
-      isCurrent: milestones.length === index,
-      description: `Pending arrival at this milestone`
+      statusName: m.statusName,
+      isCompleted: true,
+      isCurrent: false,
+      timestamp: m.timestamp,
+      driverName: driver ? driver.name : 'ClearDrop Dispatcher',
+      isDelay,
+      description: isDelay 
+        ? `Parcel delayed: ${m.delayReason || m.statusName.replace('Delay: ', '')}` 
+        : (m.statusName === 'Delivered' ? 'Package successfully handed to recipient' : 'Processed at checkpoint by driver')
     };
   });
+
+  // Prepend Pending Pickup
+  if (completedTimelineItems.length > 0) {
+    completedTimelineItems.unshift({
+      statusName: 'Pending Pickup',
+      isCompleted: true,
+      isCurrent: false,
+      timestamp: milestones[0].timestamp,
+      description: 'Order details received by ClearDrop'
+    });
+  } else {
+    completedTimelineItems.push({
+      statusName: 'Pending Pickup',
+      isCompleted: false,
+      isCurrent: true,
+      description: 'Order details received by ClearDrop'
+    });
+  }
+
+  // Find pending standard steps
+  const completedStandardNames = milestones.map(m => m.statusName);
+  const pendingStandardItems = milestoneSequence
+    .filter(name => !completedStandardNames.includes(name))
+    .map(name => ({
+      statusName: name,
+      isCompleted: false,
+      isCurrent: false,
+      description: 'Pending arrival at this milestone'
+    }));
+
+  // Combine
+  const timeline = [...completedTimelineItems, ...pendingStandardItems];
+
+  // Set current flag
+  if (milestones.length > 0) {
+    const lastCompletedIdx = completedTimelineItems.length - 1;
+    if (lastCompletedIdx >= 0) {
+      completedTimelineItems[lastCompletedIdx].isCurrent = true;
+    }
+  }
 
   return (
     <div className="mobile-frame">
@@ -111,6 +131,27 @@ const CustomerTracking = () => {
         </div>
       </div>
 
+      {/* High-visibility Warning Banner for Delay */}
+      {parcel.delayReason && (
+        <div style={{ 
+          backgroundColor: '#fffbeb', 
+          borderBottom: '1px solid #fcd34d', 
+          padding: '1rem 1.5rem', 
+          color: '#b45309',
+          fontSize: '0.875rem',
+          display: 'flex',
+          alignItems: 'start',
+          gap: '0.5rem',
+          boxShadow: 'var(--shadow-sm)',
+          zIndex: 10
+        }}>
+          <AlertCircle size={18} style={{ color: '#f59e0b', flexShrink: 0, marginTop: '2px' }} />
+          <span>
+            <strong>Notice:</strong> Your parcel is experiencing a temporary delay due to <strong>{parcel.delayReason}</strong>.
+          </span>
+        </div>
+      )}
+
       {/* Timeline Container */}
       <div style={{ padding: '1.5rem', flex: 1, backgroundColor: 'var(--surface-color)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         
@@ -146,6 +187,7 @@ const CustomerTracking = () => {
           {timeline.map((item, index) => {
             const isCompleted = item.isCompleted;
             const isCurrent = item.isCurrent;
+            const isDelay = item.isDelay;
 
             return (
               <div key={item.statusName || index} style={{ 
@@ -164,7 +206,7 @@ const CustomerTracking = () => {
                     bottom: '-36px',
                     width: '2px',
                     borderLeft: isCompleted && timeline[index + 1].isCompleted
-                      ? '2px solid var(--success)' 
+                      ? (isDelay || timeline[index + 1].isDelay ? '2px dotted #f59e0b' : '2px solid var(--success)') 
                       : '2px dashed var(--muted)',
                     zIndex: 0
                   }} />
@@ -175,17 +217,19 @@ const CustomerTracking = () => {
                   width: '32px',
                   height: '32px',
                   borderRadius: '50%',
-                  backgroundColor: isCompleted ? 'var(--success)' : 'white',
-                  border: `2px solid ${isCompleted ? 'var(--success)' : isCurrent ? 'var(--primary-color)' : 'var(--muted)'}`,
+                  backgroundColor: isDelay ? '#fffbeb' : isCompleted ? 'var(--success)' : 'white',
+                  border: `2px solid ${isDelay ? '#f59e0b' : isCompleted ? 'var(--success)' : isCurrent ? 'var(--primary-color)' : 'var(--muted)'}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
                   zIndex: 2,
-                  boxShadow: isCurrent ? '0 0 0 5px rgba(5, 150, 105, 0.25)' : 'none',
+                  boxShadow: isCurrent ? (isDelay ? '0 0 0 5px rgba(245, 158, 11, 0.25)' : '0 0 0 5px rgba(5, 150, 105, 0.25)') : 'none',
                   transition: 'box-shadow 0.3s ease'
                 }}>
-                  {isCompleted ? (
+                  {isDelay ? (
+                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#d97706' }}>⚠️</span>
+                  ) : isCompleted ? (
                     <Check size={16} color="white" strokeWidth={3} />
                   ) : (
                     <div style={{ 
@@ -202,7 +246,7 @@ const CustomerTracking = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <h4 style={{ 
                       margin: 0, 
-                      color: isCompleted ? 'var(--text-primary)' : 'var(--text-secondary)',
+                      color: isDelay ? '#d97706' : isCompleted ? 'var(--text-primary)' : 'var(--text-secondary)',
                       fontWeight: isCompleted || isCurrent ? '700' : '500',
                       fontSize: '0.95rem'
                     }}>
@@ -212,13 +256,14 @@ const CustomerTracking = () => {
                     {isCurrent && (
                       <span style={{ 
                         fontSize: '0.65rem', 
-                        backgroundColor: 'var(--primary-light)', 
-                        color: 'var(--primary-hover)', 
+                        backgroundColor: isDelay ? '#fffbeb' : 'var(--primary-light)', 
+                        color: isDelay ? '#d97706' : 'var(--primary-hover)', 
                         padding: '0.15rem 0.5rem', 
                         borderRadius: '999px',
                         fontWeight: '700',
                         textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
+                        letterSpacing: '0.05em',
+                        border: isDelay ? '1px solid #fcd34d' : 'none'
                       }}>
                         Latest Update
                       </span>

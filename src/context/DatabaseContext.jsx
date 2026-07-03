@@ -235,7 +235,26 @@ export const DatabaseProvider = ({ children }) => {
     setMilestones(prev => [...prev, newMilestone]);
     
     setParcels(prev => prev.map(p => 
-      p.id === parcelId ? { ...p, status: statusName } : p
+      p.id === parcelId ? { ...p, status: statusName, delayReason: null } : p // Reset delay status on next normal milestone
+    ));
+  };
+
+  const logDelay = (parcelId, reason, driverId) => {
+    const delayStatus = `Delay: ${reason}`;
+    const newMilestone = {
+      id: `m${Date.now()}`,
+      parcelId,
+      statusName: delayStatus,
+      driverId,
+      timestamp: new Date().toISOString(),
+      isDelay: true,
+      delayReason: reason
+    };
+    
+    setMilestones(prev => [...prev, newMilestone]);
+    
+    setParcels(prev => prev.map(p => 
+      p.id === parcelId ? { ...p, status: delayStatus, delayReason: reason } : p
     ));
   };
 
@@ -267,6 +286,7 @@ export const DatabaseProvider = ({ children }) => {
       createParcel,
       assignDriver,
       addMilestone,
+      logDelay,
       deleteParcel,
       getParcelById,
       getMilestonesForParcel,

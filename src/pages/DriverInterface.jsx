@@ -5,8 +5,11 @@ import { Camera, MapPin, Package as PackageIcon, CheckCircle2 } from 'lucide-rea
 
 const DriverInterface = () => {
   const { parcelId } = useParams();
-  const { getParcelById, getDriverById, getMilestonesForParcel, addMilestone, milestoneSequence } = useDatabase();
+  const { getParcelById, getDriverById, getMilestonesForParcel, addMilestone, logDelay, milestoneSequence } = useDatabase();
   const fileInputRef = useRef(null);
+
+  const [showDelaySelect, setShowDelaySelect] = useState(false);
+  const [selectedReason, setSelectedReason] = useState('');
 
   const parcel = getParcelById(parcelId);
   
@@ -25,10 +28,13 @@ const DriverInterface = () => {
   // Use dynamic sequence from database context
   const MILESTONES_SEQUENCE = milestoneSequence;
   
+  // Filter out delays to evaluate progress index cleanly
+  const standardMilestones = milestones.filter(m => MILESTONES_SEQUENCE.includes(m.statusName));
+  
   let currentMilestoneIndex = -1;
-  if (milestones.length > 0) {
-    const lastMilestone = milestones[milestones.length - 1];
-    currentMilestoneIndex = MILESTONES_SEQUENCE.indexOf(lastMilestone.statusName);
+  if (standardMilestones.length > 0) {
+    const lastStandardMilestone = standardMilestones[standardMilestones.length - 1];
+    currentMilestoneIndex = MILESTONES_SEQUENCE.indexOf(lastStandardMilestone.statusName);
   }
   const nextMilestone = MILESTONES_SEQUENCE[currentMilestoneIndex + 1];
   const isDelivered = currentMilestoneIndex === MILESTONES_SEQUENCE.length - 1;
@@ -84,6 +90,21 @@ const DriverInterface = () => {
           )}
         </header>
 
+        {/* Exception Delay Alert in Driver console if active */}
+        {parcel.delayReason && (
+          <div style={{ 
+            backgroundColor: '#fffbeb', 
+            border: '1px solid #fcd34d', 
+            borderRadius: 'var(--border-radius-md)', 
+            padding: '0.75rem 1rem', 
+            color: '#b45309',
+            fontSize: '0.85rem',
+            fontWeight: '600'
+          }}>
+            ⚠️ Active Delay: {parcel.delayReason}
+          </div>
+        )}
+
         {/* Parcel Info Card */}
         <div className="card" style={{ boxShadow: 'var(--shadow-sm)', padding: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
@@ -138,22 +159,85 @@ const DriverInterface = () => {
               <h4 style={{ color: 'var(--primary-hover)', margin: 0, fontWeight: '700' }}>Delivery Completed</h4>
             </div>
           ) : (
-            MILESTONES_SEQUENCE.map((milestone, index) => {
-              const isNext = milestone === nextMilestone;
-              if (!isNext) return null; 
+            <>
+              {MILESTONES_SEQUENCE.map((milestone, index) => {
+                const isNext = milestone === nextMilestone;
+                if (!isNext) return null; 
 
-              return (
-                <button 
-                  key={milestone}
-                  className="btn btn-primary"
-                  style={{ width: '100%', minHeight: '52px', fontSize: '1.1rem', fontWeight: '700' }} 
-                  onClick={() => handleMilestoneClick(milestone)}
-                  disabled={!driver}
-                >
-                  {milestone}
-                </button>
-              );
-            })
+                return (
+                  <button 
+                    key={milestone}
+                    className="btn btn-primary"
+                    style={{ width: '100%', minHeight: '52px', fontSize: '1.1rem', fontWeight: '700' }} 
+                    onClick={() => handleMilestoneClick(milestone)}
+                    disabled={!driver}
+                  >
+                    {milestone}
+                  </button>
+                );
+              })}
+
+              {/* Delay Button */}
+              <button 
+                className="btn" 
+                style={{ 
+                  width: '100%', 
+                  backgroundColor: '#fffbeb', 
+                  color: '#d97706', 
+                  border: '1px solid #fcd34d', 
+                  fontWeight: '700',
+                  minHeight: '48px'
+                }}
+                onClick={() => setShowDelaySelect(!showDelaySelect)}
+                disabled={!driver}
+              >
+                ⚠️ Report Issue / Delay
+              </button>
+
+              {/* Delay Selector dropdown card */}
+              {showDelaySelect && (
+                <div className="card" style={{ border: '1px solid #fcd34d', backgroundColor: '#fffbeb', display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1rem' }}>
+                  <label className="label" style={{ color: '#b45309', margin: 0, fontWeight: '700', fontSize: '0.85rem' }}>Select Delay Reason:</label>
+                  <select 
+                    className="input-field" 
+                    style={{ minHeight: '36px', padding: '0.25rem 0.5rem', fontSize: '0.9rem', borderColor: '#fcd34d' }}
+                    value={selectedReason}
+                    onChange={(e) => setSelectedReason(e.target.value)}
+                  >
+                    <option value="" disabled>-- Choose Reason --</option>
+                    <option value="Traffic Delay">Traffic Delay</option>
+                    <option value="Weather Exception">Weather Exception</option>
+                    <option value="Vehicle Breakdown">Vehicle Breakdown</option>
+                    <option value="Customer Unavailable">Customer Unavailable</option>
+                  </select>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button 
+                      className="btn btn-primary" 
+                      style={{ flex: 1, minHeight: '36px', fontSize: '0.85rem', backgroundColor: '#d97706', color: 'white' }}
+                      onClick={() => {
+                        if (!selectedReason) return;
+                        logDelay(parcelId, selectedReason, driver.id);
+                        setShowDelaySelect(false);
+                        setSelectedReason('');
+                      }}
+                      disabled={!selectedReason}
+                    >
+                      Submit
+                    </button>
+                    <button 
+                      className="btn btn-secondary" 
+                      style={{ flex: 1, minHeight: '36px', fontSize: '0.85rem', borderColor: '#cbd5e1' }}
+                      onClick={() => {
+                        setShowDelaySelect(false);
+                        setSelectedReason('');
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Proof of Delivery Photo */}
@@ -167,7 +251,7 @@ const DriverInterface = () => {
           />
           <button 
             className="btn btn-secondary" 
-            style={{ width: '100%', minHeight: '48px', fontWeight: '600' }}
+            style={{ width: '100%', minHeight: '48px', fontWeight: '600', marginTop: '0.25rem' }}
             onClick={() => fileInputRef.current.click()}
           >
             <Camera size={18} /> Take Proof of Delivery Photo
