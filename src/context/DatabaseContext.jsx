@@ -33,7 +33,7 @@ const DEFAULT_MILESTONES_SEQUENCE = [
 ];
 
 const DEFAULT_BRANDING = {
-  companyName: 'ClearDrop Admin',
+  companyName: 'ClearDrop',
   supportPhone: '+91 1800 123 4567',
   logoUrl: ''
 };

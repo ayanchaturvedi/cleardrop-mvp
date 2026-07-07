@@ -136,7 +136,7 @@ const DriverInterface = () => {
               <PackageIcon size={20} color="var(--primary-color)" />
             )}
             <span style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--primary-color)', letterSpacing: '-0.01em' }}>
-              {branding.companyName}
+              {branding.companyName ? branding.companyName.replace(/\s*Admin\s*$/i, '') : ''}
             </span>
           </div>
 
