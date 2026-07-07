@@ -38,6 +38,17 @@ const DEFAULT_BRANDING = {
   logoUrl: ''
 };
 
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 // Database field mappings to frontend camelCase
 const mapOrgFromDb = (o) => {
   if (!o) return null;
@@ -273,6 +284,14 @@ export const DatabaseProvider = ({ children }) => {
     };
   }, [isOffline]);
 
+  // Clear stale admin user sessions with invalid (non-UUID) organizationId format
+  useEffect(() => {
+    if (adminUser && typeof adminUser.organizationId === 'string' && adminUser.organizationId.startsWith('org-')) {
+      console.warn('[Session Sync] Logging out stale admin user with legacy organizationId format.');
+      logout();
+    }
+  }, [adminUser]);
+
   // Sync auth state to local storage
   useEffect(() => {
     localStorage.setItem('cleardrop_auth', isAuthenticated);
@@ -386,8 +405,8 @@ export const DatabaseProvider = ({ children }) => {
   };
 
   const signUp = async (name, email, password, orgName, orgLogo) => {
-    const orgId = `org-${Date.now()}`;
-    const adminId = `adm-${Date.now()}`;
+    const orgId = generateUUID();
+    const adminId = generateUUID();
 
     if (supabase && !isOffline) {
       try {
