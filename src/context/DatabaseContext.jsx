@@ -843,7 +843,18 @@ export const DatabaseProvider = ({ children }) => {
     }
   };
 
-  const getParcelById = (id) => rawParcels.find(p => p.id === id || p.trackingNumber === id);
+  const cleanId = (str) => {
+    if (typeof str !== 'string') return '';
+    return str.toLowerCase().replace(/[^a-z0-9]/g, '');
+  };
+
+  const getParcelById = (id) => {
+    if (!id) return null;
+    const target = cleanId(id);
+    return rawParcels.find(p => 
+      cleanId(p.id) === target || cleanId(p.trackingNumber) === target
+    );
+  };
   const getMilestonesForParcel = (parcelId) => rawMilestones.filter(m => m.parcelId === parcelId).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   const getDriverById = (id) => rawDrivers.find(d => d.id === id);
 

@@ -15,7 +15,8 @@ const DriverInterface = () => {
     milestoneSequence, 
     drivers, 
     branding,
-    isOffline 
+    isOffline,
+    isLoading 
   } = useDatabase();
 
   const fileInputRef = useRef(null);
@@ -48,6 +49,18 @@ const DriverInterface = () => {
       setShowHandoffQr(true);
     }
   }, [parcel?.status]);
+
+  if (isLoading) {
+    return (
+      <div className="mobile-frame" style={{ justifyContent: 'center', alignItems: 'center', padding: '2rem', textAlign: 'center' }}>
+        <div style={{ border: '4px solid rgba(0,0,0,0.1)', width: '36px', height: '36px', borderRadius: '50%', borderLeftColor: 'var(--primary-color)', animation: 'spin 1s linear infinite', margin: '0 auto' }}></div>
+        <p style={{ marginTop: '1rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Loading console details...</p>
+        <style>{`
+          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        `}</style>
+      </div>
+    );
+  }
 
   if (!parcel) {
     return (
