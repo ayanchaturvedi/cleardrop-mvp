@@ -38,7 +38,7 @@ const Login = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
@@ -51,7 +51,7 @@ const Login = () => {
         setError('Please enter your name.');
         return;
       }
-      const success = signUp(name, email, password, orgName, orgLogo);
+      const success = await signUp(name, email, password, orgName, orgLogo);
       if (success) {
         const origin = location.state?.from?.pathname || '/';
         navigate(origin);
@@ -59,7 +59,7 @@ const Login = () => {
         setError('This email is already registered. Please log in.');
       }
     } else {
-      const success = login(email, password);
+      const success = await login(email, password);
       if (success) {
         const origin = location.state?.from?.pathname || '/';
         navigate(origin);

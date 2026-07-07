@@ -14,7 +14,8 @@ const DriverInterface = () => {
     transferParcel, 
     milestoneSequence, 
     drivers, 
-    branding 
+    branding,
+    isOffline 
   } = useDatabase();
 
   const fileInputRef = useRef(null);
@@ -51,6 +52,11 @@ const DriverInterface = () => {
   if (!parcel) {
     return (
       <div className="mobile-frame" style={{ justifyContent: 'center', alignItems: 'center', padding: '2rem', textAlign: 'center' }}>
+        {isOffline && (
+          <div style={{ backgroundColor: '#fef3c7', color: '#b45309', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: '600', width: '100%', borderRadius: '4px', marginBottom: '1.5rem' }}>
+            ⚠️ Offline Fallback Mode
+          </div>
+        )}
         <h2>Parcel Not Found</h2>
         <p style={{ color: 'var(--text-secondary)' }}>The tracking link might be invalid.</p>
       </div>
@@ -93,6 +99,11 @@ const DriverInterface = () => {
 
   return (
     <div className="mobile-frame">
+      {isOffline && (
+        <div style={{ backgroundColor: '#fef3c7', color: '#b45309', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid #fde68a' }}>
+          ⚠️ Offline Fallback Mode
+        </div>
+      )}
       <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1 }}>
         
         {/* Header Branding */}

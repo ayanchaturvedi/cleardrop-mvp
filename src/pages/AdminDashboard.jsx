@@ -19,7 +19,8 @@ const AdminDashboard = () => {
     adminUser,
     branding,
     updateBranding,
-    logout 
+    logout,
+    isOffline
   } = useDatabase();
 
   const [copiedId, setCopiedId] = useState(null);
@@ -341,6 +342,23 @@ const AdminDashboard = () => {
           </button>
         </div>
       </nav>
+
+      {isOffline && (
+        <div style={{ 
+          backgroundColor: '#fef3c7', 
+          borderBottom: '1px solid #fde68a', 
+          color: '#b45309', 
+          padding: '0.75rem 2rem', 
+          fontSize: '0.875rem', 
+          fontWeight: '600', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          gap: '0.5rem' 
+        }}>
+          <span>⚠️ Connection Error: Unable to sync with live cloud database. Operating in local offline fallback mode.</span>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="container" style={{ padding: '2rem 1rem', flex: 1 }}>

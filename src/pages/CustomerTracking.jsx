@@ -6,13 +6,18 @@ import { format } from 'date-fns';
 
 const CustomerTracking = () => {
   const { parcelId } = useParams();
-  const { getParcelById, getMilestonesForParcel, getDriverById, milestoneSequence, branding } = useDatabase();
+  const { getParcelById, getMilestonesForParcel, getDriverById, milestoneSequence, branding, isOffline } = useDatabase();
 
   const parcel = getParcelById(parcelId);
   
   if (!parcel) {
     return (
       <div className="mobile-frame" style={{ justifyContent: 'center', alignItems: 'center', padding: '2rem', textAlign: 'center' }}>
+        {isOffline && (
+          <div style={{ backgroundColor: '#fef3c7', color: '#b45309', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: '600', width: '100%', borderRadius: '4px', marginBottom: '1.5rem' }}>
+            ⚠️ Offline Fallback Mode
+          </div>
+        )}
         <AlertCircle size={48} color="var(--error)" style={{ marginBottom: '1rem' }} />
         <h2>Parcel Not Found</h2>
         <p style={{ color: 'var(--text-secondary)' }}>Please check your tracking link.</p>
@@ -96,6 +101,11 @@ const CustomerTracking = () => {
 
   return (
     <div className="mobile-frame">
+      {isOffline && (
+        <div style={{ backgroundColor: '#fef3c7', color: '#b45309', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid #fde68a' }}>
+          ⚠️ Offline Fallback Mode
+        </div>
+      )}
       {/* Header Banner - Full Width rectangular */}
       <div style={{ 
         backgroundColor: 'var(--primary-color)', 
