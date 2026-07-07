@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useDatabase } from '../context/DatabaseContext';
+import { supabase } from '../supabaseClient';
 import { Package, Users, Share2, Copy, Check, Trash2, CheckCircle, User, Phone, MapPin, ClipboardList, LogOut, Settings, ArrowUp, ArrowDown, Plus, Upload, Building } from 'lucide-react';
 
 const AdminDashboard = () => {
   const { 
-    parcels, 
-    drivers, 
+    parcels: contextParcels, 
+    drivers: contextDrivers, 
     milestoneSequence, 
     createParcel, 
     assignDriver, 
@@ -25,6 +26,70 @@ const AdminDashboard = () => {
 
   const [copiedId, setCopiedId] = useState(null);
   const [activeTab, setActiveTab] = useState('parcels'); // 'parcels' | 'drivers' | 'milestones' | 'settings'
+
+  // Local state for parcels and drivers to fetch persistent data from cloud
+  const [drivers, setDrivers] = useState([]);
+  const [parcels, setParcels] = useState([]);
+
+  useEffect(() => {
+    const fetchDrivers = async () => {
+      if (!supabase || isOffline) {
+        setDrivers(contextDrivers);
+        return;
+      }
+      try {
+        const orgId = adminUser?.organizationId || '00000000-0000-0000-0000-000000000000';
+        const { data, error } = await supabase
+          .from('drivers')
+          .select('*')
+          .eq('organization_id', orgId);
+        if (data) {
+          setDrivers(data.map(d => ({
+            id: d.id,
+            name: d.name,
+            phone: d.phone,
+            vehicleNumber: d.vehicle_number,
+            organizationId: d.organization_id
+          })));
+        }
+      } catch (err) {
+        console.error('Failed to fetch drivers directly:', err);
+      }
+    };
+
+    const fetchParcels = async () => {
+      if (!supabase || isOffline) {
+        setParcels(contextParcels);
+        return;
+      }
+      try {
+        const orgId = adminUser?.organizationId || '00000000-0000-0000-0000-000000000000';
+        const { data, error } = await supabase
+          .from('parcels')
+          .select('*')
+          .eq('organization_id', orgId);
+        if (data) {
+          setParcels(data.map(p => ({
+            id: p.id,
+            trackingNumber: p.tracking_number,
+            senderName: p.sender_name,
+            recipientPhone: p.recipient_phone,
+            packageDetails: p.package_details,
+            destination: p.destination,
+            currentDriverId: p.current_driver_id,
+            status: p.status,
+            delayReason: p.delay_reason,
+            organizationId: p.organization_id
+          })));
+        }
+      } catch (err) {
+        console.error('Failed to fetch parcels directly:', err);
+      }
+    };
+
+    fetchDrivers();
+    fetchParcels();
+  }, [adminUser, isOffline, contextDrivers, contextParcels]);
 
   // Forms State
   const [parcelForm, setParcelForm] = useState({
@@ -77,33 +142,99 @@ const AdminDashboard = () => {
     setParcelForm({ ...parcelForm, [e.target.name]: e.target.value });
   };
 
-  const handleCreateParcel = (e) => {
+  const handleCreateParcel = async (e) => {
     e.preventDefault();
     if (!parcelForm.senderName || !parcelForm.destination) return;
     
-    createParcel(parcelForm);
+    const newParcelId = `p${Date.now()}`;
+    const trackingNumber = `CD-${Math.floor(1000000 + Math.random() * 9000000)}`;
+    const orgId = adminUser?.organizationId || '00000000-0000-0000-0000-000000000000';
+    
+    const newParcel = {
+      id: newParcelId,
+      trackingNumber,
+      senderName: parcelForm.senderName,
+      recipientPhone: parcelForm.recipientPhone,
+      packageDetails: parcelForm.packageDetails,
+      destination: parcelForm.destination,
+      status: 'Pending Pickup',
+      organizationId: orgId
+    };
+
+    // Optimistically update local UI list
+    setParcels(prev => [newParcel, ...prev]);
+
     setParcelForm({
       senderName: '',
       recipientPhone: '',
       packageDetails: '',
       destination: ''
     });
+
+    if (supabase && !isOffline) {
+      try {
+        const { error } = await supabase.from('parcels').insert([{
+          id: newParcelId,
+          tracking_number: trackingNumber,
+          sender_name: newParcel.senderName,
+          recipient_phone: newParcel.recipientPhone,
+          package_details: newParcel.packageDetails,
+          destination: newParcel.destination,
+          status: newParcel.status,
+          organization_id: orgId
+        }]);
+        if (error) throw error;
+      } catch (err) {
+        console.error('Supabase parcel insert failed:', err);
+      }
+    } else {
+      createParcel(parcelForm);
+    }
   };
 
   const handleDriverChange = (e) => {
     setDriverForm({ ...driverForm, [e.target.name]: e.target.value });
   };
 
-  const handleAddDriver = (e) => {
+  const handleAddDriver = async (e) => {
     e.preventDefault();
     if (!driverForm.name || !driverForm.phone || !driverForm.vehicleNumber) return;
 
-    addDriver(driverForm);
+    const newDriverId = `d${Date.now()}`;
+    const orgId = adminUser?.organizationId || '00000000-0000-0000-0000-000000000000';
+    const newDriver = {
+      id: newDriverId,
+      name: driverForm.name,
+      phone: driverForm.phone,
+      vehicleNumber: driverForm.vehicleNumber,
+      organizationId: orgId
+    };
+
+    // Optimistically update local UI list
+    setDrivers(prev => [...prev, newDriver]);
+
     setDriverForm({
       name: '',
       phone: '',
       vehicleNumber: ''
     });
+
+    if (supabase && !isOffline) {
+      try {
+        const { error } = await supabase.from('drivers').insert([{
+          id: newDriverId,
+          name: newDriver.name,
+          phone: newDriver.phone,
+          vehicle_number: newDriver.vehicleNumber,
+          organization_id: orgId
+        }]);
+        if (error) throw error;
+      } catch (err) {
+        console.error('Supabase driver insert failed:', err);
+      }
+    } else {
+      addDriver(driverForm);
+    }
   };
 
   const handleAddMilestone = (e) => {
