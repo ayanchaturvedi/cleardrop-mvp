@@ -471,6 +471,7 @@ const AdminDashboard = () => {
             fontWeight: '600'
           }}>
             Admin Dashboard
+          </span>
         </div>
 
         {/* Profile Section & Log Out */}
