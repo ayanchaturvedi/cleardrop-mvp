@@ -740,7 +740,7 @@ export const DatabaseProvider = ({ children }) => {
 
     if (supabase && !isOffline) {
       try {
-        await supabase.from('parcels').insert({
+        const { error } = await supabase.from('parcels').insert({
           id: newParcel.id,
           tracking_number: newParcel.trackingNumber,
           sender_name: newParcel.senderName,
@@ -752,13 +752,17 @@ export const DatabaseProvider = ({ children }) => {
           organization_id: newParcel.organizationId,
           customer_id: newParcel.customerId || null,
           parcel_dimensions: newParcel.parcelDimensions || null,
-          parcel_weight: newParcel.parcelWeight || null,
+          parcel_weight: newParcel.parcelWeight ? Number(newParcel.parcelWeight) : null,
           parcel_type: newParcel.parcelType || null,
           pickup_address: newParcel.pickupAddress || null,
           escrow_locked_amount: newParcel.escrowLockedAmount || 0
         });
+        if (error) {
+          console.error('Failed to create parcel in Supabase:', error);
+          alert('Failed to submit request: ' + error.message);
+        }
       } catch (err) {
-        console.error('Failed to create parcel in Supabase:', err);
+        console.error('Network error during create parcel:', err);
       }
     } else {
       localStorage.setItem('cleardrop_parcels', JSON.stringify([newParcel, ...rawParcels]));
