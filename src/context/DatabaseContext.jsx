@@ -471,6 +471,8 @@ export const DatabaseProvider = ({ children }) => {
         return true;
       } catch (err) {
         console.error('Database sign up failed:', err);
+        alert('Failed to sign up in the cloud: ' + err.message);
+        return false;
       }
     }
 
