@@ -732,8 +732,8 @@ export const DatabaseProvider = ({ children }) => {
       ...parcelData,
       id: `p${Date.now()}`,
       trackingNumber: `CD-${Math.floor(1000000 + Math.random() * 9000000)}`,
-      status: 'Pending Pickup',
-      organizationId: adminUser?.organizationId || '00000000-0000-0000-0000-000000000000'
+      status: parcelData.status || 'Pending Pickup',
+      organizationId: parcelData.organizationId || currentUser?.organizationId || '00000000-0000-0000-0000-000000000000'
     };
 
     setRawParcels(prev => [newParcel, ...prev]);
