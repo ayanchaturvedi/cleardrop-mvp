@@ -1,10 +1,10 @@
 import React from 'react';
 import { useDatabase } from '../context/DatabaseContext';
-import { Shield, CheckCircle, XCircle, FileText, Building, Phone } from 'lucide-react';
+import { Shield, CheckCircle, XCircle, FileText, Building, Phone, LogOut } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
 const SuperAdminDashboard = () => {
-  const { organizations, currentUser, toggleOrganizationVerification } = useDatabase();
+  const { organizations, currentUser, toggleOrganizationVerification, logout } = useDatabase();
 
   if (!currentUser || currentUser.role !== 'super_admin') {
     return <Navigate to="/" />;
@@ -17,9 +17,25 @@ const SuperAdminDashboard = () => {
   return (
     <div style={{ padding: '2rem', backgroundColor: 'var(--bg-color)', minHeight: '100vh' }}>
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-          <Shield size={32} color="var(--primary-color)" />
-          <h1 style={{ fontSize: '2rem', margin: 0, color: 'var(--text-primary)' }}>Super Admin Dashboard</h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <Shield size={32} color="var(--primary-color)" />
+            <h1 style={{ fontSize: '2rem', margin: 0, color: 'var(--text-primary)' }}>Super Admin Dashboard</h1>
+          </div>
+          <button 
+            onClick={logout} 
+            className="btn btn-secondary" 
+            style={{ 
+              minHeight: '36px', 
+              padding: '0 0.75rem', 
+              fontSize: '0.85rem', 
+              gap: '0.4rem',
+              color: 'var(--text-secondary)',
+              borderColor: 'var(--border-color)'
+            }}
+          >
+            <LogOut size={14} /> Log Out
+          </button>
         </div>
 
         <div className="card" style={{ padding: '1.5rem', boxShadow: 'var(--shadow-md)' }}>
