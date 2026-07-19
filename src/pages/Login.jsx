@@ -1,21 +1,25 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useDatabase } from '../context/DatabaseContext';
-import { Package, Lock, Mail, AlertCircle, User, Building, Upload } from 'lucide-react';
+import { supabase } from '../supabaseClient';
+import { Package, Lock, Mail, AlertCircle, User, Building, Upload, Store, UserCircle, ShieldAlert } from 'lucide-react';
 
 const Login = () => {
   const { login, signUp, isAuthenticated } = useDatabase();
   
   // Toggle Mode State
   const [isSignUp, setIsSignUp] = useState(false);
+  const [selectedRole, setSelectedRole] = useState('customer'); // 'customer' | 'business_owner' | 'super_admin'
 
   // Form Fields
   const [orgName, setOrgName] = useState('');
   const [orgLogo, setOrgLogo] = useState(null);
+  const [msmeFile, setMsmeFile] = useState(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleLogoUpload = (e) => {
     const file = e.target.files[0];
@@ -25,6 +29,13 @@ const Login = () => {
         setOrgLogo(reader.result);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleMsmeUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setMsmeFile(file);
     }
   };
   
@@ -43,15 +54,47 @@ const Login = () => {
     setError('');
 
     if (isSignUp) {
-      if (!orgName.trim()) {
+      if (selectedRole === 'business_owner' && !orgName.trim()) {
         setError('Please enter your organization name.');
+        return;
+      }
+      if (selectedRole === 'business_owner' && !msmeFile) {
+        setError('Please upload your MSME certificate for verification.');
         return;
       }
       if (!name.trim()) {
         setError('Please enter your name.');
         return;
       }
-      const success = await signUp(name, email, password, orgName, orgLogo);
+
+      let msmeCertUrl = '';
+      if (selectedRole === 'business_owner' && msmeFile && supabase) {
+        setIsUploading(true);
+        try {
+          const fileExt = msmeFile.name.split('.').pop();
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+          
+          const { data, error: uploadError } = await supabase.storage
+            .from('msme-certificates')
+            .upload(fileName, msmeFile);
+            
+          if (uploadError) throw uploadError;
+          
+          const { data: publicUrlData } = supabase.storage
+            .from('msme-certificates')
+            .getPublicUrl(fileName);
+            
+          msmeCertUrl = publicUrlData.publicUrl;
+        } catch (err) {
+          console.error(err);
+          setError('Failed to upload MSME certificate: ' + err.message);
+          setIsUploading(false);
+          return;
+        }
+        setIsUploading(false);
+      }
+
+      const success = await signUp(name, email, password, selectedRole, orgName, orgLogo, msmeCertUrl);
       if (success) {
         const origin = location.state?.from?.pathname || '/';
         navigate(origin);
@@ -80,7 +123,7 @@ const Login = () => {
     }}>
       <div className="card" style={{ 
         width: '100%', 
-        maxWidth: '400px', 
+        maxWidth: '450px', 
         boxShadow: 'var(--shadow-lg)',
         padding: '2.5rem 2rem'
       }}>
@@ -104,10 +147,10 @@ const Login = () => {
             <Package size={32} color="var(--primary-color)" />
           </div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--primary-color)', letterSpacing: '-0.02em', margin: 0 }}>
-            {isSignUp ? 'Register Your Organization' : 'ClearDrop'}
+            {isSignUp ? 'Join ClearDrop' : 'Welcome Back'}
           </h1>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            {isSignUp ? 'Set up your brand and administrator account to get started.' : 'Logistics Milestone Dashboard'}
+            {isSignUp ? 'Create your account to get started.' : 'Log in to your dashboard.'}
           </p>
         </div>
 
@@ -130,54 +173,140 @@ const Login = () => {
           </div>
         )}
 
+        {/* Role Selection for Sign Up */}
+        {isSignUp && (
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+            <div 
+              onClick={() => setSelectedRole('customer')}
+              style={{
+                flex: '1 1 calc(50% - 0.25rem)',
+                padding: '1rem',
+                border: `2px solid ${selectedRole === 'customer' ? 'var(--primary-color)' : 'var(--border-color)'}`,
+                borderRadius: 'var(--border-radius-md)',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '0.5rem',
+                backgroundColor: selectedRole === 'customer' ? 'var(--primary-light)' : 'transparent',
+                transition: 'all 0.2s'
+              }}
+            >
+              <UserCircle size={24} color={selectedRole === 'customer' ? 'var(--primary-color)' : 'var(--text-secondary)'} />
+              <span style={{ fontSize: '0.85rem', fontWeight: selectedRole === 'customer' ? '700' : '500', color: selectedRole === 'customer' ? 'var(--primary-color)' : 'var(--text-primary)', textAlign: 'center' }}>Customer</span>
+            </div>
+            <div 
+              onClick={() => setSelectedRole('business_owner')}
+              style={{
+                flex: '1 1 calc(50% - 0.25rem)',
+                padding: '1rem',
+                border: `2px solid ${selectedRole === 'business_owner' ? 'var(--primary-color)' : 'var(--border-color)'}`,
+                borderRadius: 'var(--border-radius-md)',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '0.5rem',
+                backgroundColor: selectedRole === 'business_owner' ? 'var(--primary-light)' : 'transparent',
+                transition: 'all 0.2s'
+              }}
+            >
+              <Store size={24} color={selectedRole === 'business_owner' ? 'var(--primary-color)' : 'var(--text-secondary)'} />
+              <span style={{ fontSize: '0.85rem', fontWeight: selectedRole === 'business_owner' ? '700' : '500', color: selectedRole === 'business_owner' ? 'var(--primary-color)' : 'var(--text-primary)', textAlign: 'center' }}>Business Owner</span>
+            </div>
+            <div 
+              onClick={() => setSelectedRole('super_admin')}
+              style={{
+                flex: '1 1 100%',
+                padding: '0.75rem',
+                border: `2px solid ${selectedRole === 'super_admin' ? 'var(--primary-color)' : 'var(--border-color)'}`,
+                borderRadius: 'var(--border-radius-md)',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '0.5rem',
+                backgroundColor: selectedRole === 'super_admin' ? 'var(--primary-light)' : 'transparent',
+                transition: 'all 0.2s'
+              }}
+            >
+              <ShieldAlert size={18} color={selectedRole === 'super_admin' ? 'var(--primary-color)' : 'var(--text-secondary)'} />
+              <span style={{ fontSize: '0.85rem', fontWeight: selectedRole === 'super_admin' ? '700' : '500', color: selectedRole === 'super_admin' ? 'var(--primary-color)' : 'var(--text-primary)' }}>Register as Super Admin</span>
+            </div>
+          </div>
+        )}
+
         {/* Auth Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
-          {/* Conditional Admin Name input for Sign Up mode */}
           {isSignUp && (
             <>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
-                  <Building size={14} style={{ color: 'var(--text-secondary)' }} />
-                  Organization Name
-                </label>
-                <input 
-                  type="text" 
-                  className="input-field" 
-                  value={orgName} 
-                  onChange={(e) => setOrgName(e.target.value)} 
-                  placeholder="e.g., ClearDrop Logistics"
-                  required={isSignUp} 
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
-                  <Upload size={14} style={{ color: 'var(--text-secondary)' }} />
-                  Organization Logo
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  {orgLogo ? (
-                    <div style={{ position: 'relative', width: '48px', height: '48px' }}>
-                      <img src={orgLogo} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%', border: '2px solid var(--primary-color)' }} alt="Org Logo" />
-                      <button type="button" onClick={() => setOrgLogo(null)} style={{ position: 'absolute', top: -5, right: -5, background: 'var(--error)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '10px' }}>×</button>
-                    </div>
-                  ) : (
-                    <label style={{ width: '48px', height: '48px', borderRadius: '50%', border: '1px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backgroundColor: '#f8fafc', flexShrink: 0 }}>
-                      <Upload size={16} color="var(--text-secondary)" />
-                      <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+              {selectedRole === 'business_owner' && (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                      <Building size={14} style={{ color: 'var(--text-secondary)' }} />
+                      Organization Name
                     </label>
-                  )}
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    {orgLogo ? 'Logo uploaded' : 'Upload a brand logo (optional)'}
-                  </span>
-                </div>
-              </div>
+                    <input 
+                      type="text" 
+                      className="input-field" 
+                      value={orgName} 
+                      onChange={(e) => setOrgName(e.target.value)} 
+                      placeholder="e.g., ClearDrop Logistics"
+                      required={selectedRole === 'business_owner'} 
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                      <Upload size={14} style={{ color: 'var(--text-secondary)' }} />
+                      Organization Logo
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      {orgLogo ? (
+                        <div style={{ position: 'relative', width: '48px', height: '48px' }}>
+                          <img src={orgLogo} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%', border: '2px solid var(--primary-color)' }} alt="Org Logo" />
+                          <button type="button" onClick={() => setOrgLogo(null)} style={{ position: 'absolute', top: -5, right: -5, background: 'var(--error)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '10px' }}>×</button>
+                        </div>
+                      ) : (
+                        <label style={{ width: '48px', height: '48px', borderRadius: '50%', border: '1px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backgroundColor: '#f8fafc', flexShrink: 0 }}>
+                          <Upload size={16} color="var(--text-secondary)" />
+                          <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+                        </label>
+                      )}
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        {orgLogo ? 'Logo uploaded' : 'Upload a brand logo (optional)'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                      <ShieldAlert size={14} style={{ color: 'var(--text-secondary)' }} />
+                      MSME Certificate (PDF/Image)
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <label style={{ flex: 1, padding: '0.5rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backgroundColor: '#f8fafc' }}>
+                        <Upload size={16} color="var(--text-secondary)" style={{ marginRight: '0.5rem' }} />
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                          {msmeFile ? msmeFile.name : 'Choose File'}
+                        </span>
+                        <input type="file" accept=".pdf,image/*" onChange={handleMsmeUpload} style={{ display: 'none' }} />
+                      </label>
+                      {msmeFile && (
+                        <button type="button" onClick={() => setMsmeFile(null)} style={{ background: 'var(--error)', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px' }}>×</button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
                   <User size={14} style={{ color: 'var(--text-secondary)' }} />
-                  Administrator Name
+                  Full Name
                 </label>
                 <input 
                   type="text" 
@@ -194,7 +323,7 @@ const Login = () => {
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
               <Mail size={14} style={{ color: 'var(--text-secondary)' }} />
-              Admin Email
+              Email Address
             </label>
             <input 
               type="email" 
@@ -221,8 +350,8 @@ const Login = () => {
             />
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', fontWeight: '700', marginTop: '0.5rem' }}>
-            {isSignUp ? 'Register & Launch Dashboard' : 'Log In'}
+          <button type="submit" disabled={isUploading} className="btn btn-primary" style={{ width: '100%', fontWeight: '700', marginTop: '0.5rem', opacity: isUploading ? 0.7 : 1 }}>
+            {isUploading ? 'Uploading...' : isSignUp ? 'Create Account' : 'Log In'}
           </button>
         </form>
 
@@ -234,6 +363,7 @@ const Login = () => {
             setError('');
             setOrgName('');
             setOrgLogo(null);
+            setMsmeFile(null);
             setName('');
             setEmail('');
             setPassword('');
@@ -245,7 +375,9 @@ const Login = () => {
             fontWeight: '700',
             width: '100%',
             textAlign: 'center',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            background: 'none',
+            border: 'none'
           }}
           onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
           onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}

@@ -56,7 +56,13 @@ const mapOrgFromDb = (o) => {
     id: o.id,
     companyName: o.name,
     logoUrl: o.logo_url || '',
-    supportPhone: o.support_phone || '+91 1800 123 4567'
+    supportPhone: o.support_phone || '+91 1800 123 4567',
+    isVerified: o.is_verified || false,
+    msmeCertificateUrl: o.msme_certificate_url || '',
+    serviceableCities: o.serviceable_cities || [],
+    pricePerKm: o.price_per_km || 0,
+    advancePercent: o.advance_percent || 0,
+    walletBalance: o.wallet_balance || 0
   };
 };
 
@@ -83,7 +89,13 @@ const mapParcelFromDb = (p) => {
     currentDriverId: p.current_driver_id,
     status: p.status,
     delayReason: p.delay_reason,
-    organizationId: p.organization_id
+    organizationId: p.organization_id,
+    customerId: p.customer_id,
+    parcelDimensions: p.parcel_dimensions,
+    parcelWeight: p.parcel_weight,
+    parcelType: p.parcel_type,
+    pickupAddress: p.pickup_address,
+    escrowLockedAmount: p.escrow_locked_amount || 0
   };
 };
 
@@ -108,15 +120,15 @@ export const DatabaseProvider = ({ children }) => {
     return localStorage.getItem('cleardrop_auth') === 'true';
   });
 
-  // Admin User Profile State
-  const [adminUser, setAdminUser] = useState(() => {
+  // Current User Profile State (Replaces adminUser)
+  const [currentUser, setCurrentUser] = useState(() => {
     try {
-      const saved = localStorage.getItem('cleardrop_admin_user');
+      const saved = localStorage.getItem('cleardrop_current_user');
       if (saved && saved !== 'undefined') {
         return JSON.parse(saved);
       }
     } catch (e) {
-      console.error('Failed to parse admin user', e);
+      console.error('Failed to parse current user', e);
     }
     return null;
   });
@@ -286,11 +298,11 @@ export const DatabaseProvider = ({ children }) => {
 
   // Clear stale admin user sessions with invalid (non-UUID) organizationId format
   useEffect(() => {
-    if (adminUser && typeof adminUser.organizationId === 'string' && adminUser.organizationId.startsWith('org-')) {
-      console.warn('[Session Sync] Logging out stale admin user with legacy organizationId format.');
+    if (currentUser && typeof currentUser.organizationId === 'string' && currentUser.organizationId.startsWith('org-')) {
+      console.warn('[Session Sync] Logging out stale user with legacy organizationId format.');
       logout();
     }
-  }, [adminUser]);
+  }, [currentUser]);
 
   // Sync auth state to local storage
   useEffect(() => {
@@ -298,15 +310,15 @@ export const DatabaseProvider = ({ children }) => {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    localStorage.setItem('cleardrop_admin_user', adminUser ? JSON.stringify(adminUser) : 'undefined');
-  }, [adminUser]);
+    localStorage.setItem('cleardrop_current_user', currentUser ? JSON.stringify(currentUser) : 'undefined');
+  }, [currentUser]);
 
   // Dynamic context resolution based on admin session or URL param
   const [activeOrgId, setActiveOrgId] = useState('00000000-0000-0000-0000-000000000000');
 
   useEffect(() => {
-    if (adminUser?.organizationId) {
-      setActiveOrgId(adminUser.organizationId);
+    if (currentUser?.organizationId) {
+      setActiveOrgId(currentUser.organizationId);
       return;
     }
 
@@ -321,15 +333,15 @@ export const DatabaseProvider = ({ children }) => {
       }
     }
     setActiveOrgId('00000000-0000-0000-0000-000000000000');
-  }, [adminUser, rawParcels, window.location.pathname]);
+  }, [currentUser, rawParcels, window.location.pathname]);
 
   // Computed state getters
-  const drivers = adminUser 
-    ? rawDrivers.filter(d => d.organizationId === adminUser.organizationId)
+  const drivers = currentUser 
+    ? rawDrivers.filter(d => d.organizationId === currentUser.organizationId)
     : rawDrivers.filter(d => d.organizationId === activeOrgId);
 
-  const parcels = adminUser
-    ? rawParcels.filter(p => p.organizationId === adminUser.organizationId)
+  const parcels = currentUser
+    ? rawParcels.filter(p => p.organizationId === currentUser.organizationId)
     : rawParcels;
 
   const milestones = rawMilestones;
@@ -346,34 +358,41 @@ export const DatabaseProvider = ({ children }) => {
 
   // Auth Actions
   const login = async (email, password) => {
+    // Legacy default admin check
     if (email === 'admin@cleardrop.com' && password === 'admin123') {
       setIsAuthenticated(true);
       const defaultAdmin = {
-        name: 'Admin User',
+        name: 'Super Admin',
         email,
+        role: 'super_admin',
         organizationId: '00000000-0000-0000-0000-000000000000'
       };
-      setAdminUser(defaultAdmin);
+      setCurrentUser(defaultAdmin);
       return true;
     }
 
     if (supabase && !isOffline) {
       try {
+        // Query users table instead of admins
         const { data, error } = await supabase
-          .from('admins')
+          .from('users')
           .select('*')
           .eq('email', email)
-          .eq('password', password)
+          // Since we don't have password in our users schema right now for MVP testing
+          // we are assuming simple auth. In a real app this uses auth.users.
           .maybeSingle();
 
         if (error) throw error;
 
         if (data) {
           setIsAuthenticated(true);
-          setAdminUser({
+          setCurrentUser({
+            id: data.id,
             name: data.name,
             email: data.email,
-            organizationId: data.organization_id
+            role: data.role,
+            organizationId: data.organization_id,
+            walletBalance: data.wallet_balance || 0
           });
           return true;
         }
@@ -383,61 +402,72 @@ export const DatabaseProvider = ({ children }) => {
     }
 
     try {
-      const registered = localStorage.getItem('cleardrop_registered_admins');
+      const registered = localStorage.getItem('cleardrop_registered_users');
       if (registered) {
-        const adminsList = JSON.parse(registered);
-        const match = adminsList.find(a => a.email === email && a.password === password);
+        const usersList = JSON.parse(registered);
+        const match = usersList.find(a => a.email === email && a.password === password);
         if (match) {
           setIsAuthenticated(true);
-          setAdminUser({
+          setCurrentUser({
+            id: match.id,
             name: match.name,
             email: match.email,
-            organizationId: match.organizationId || '00000000-0000-0000-0000-000000000000'
+            role: match.role,
+            organizationId: match.organizationId || '00000000-0000-0000-0000-000000000000',
+            walletBalance: match.walletBalance || 0
           });
           return true;
         }
       }
     } catch (e) {
-      console.error('Failed to read registered admins locally', e);
+      console.error('Failed to read registered users locally', e);
     }
 
     return false;
   };
 
-  const signUp = async (name, email, password, orgName, orgLogo) => {
-    const orgId = generateUUID();
-    const adminId = generateUUID();
+  const signUp = async (name, email, password, role = 'customer', orgName = '', orgLogo = '', msmeCertUrl = '') => {
+    const userId = generateUUID();
+    let orgId = null;
+
+    if (role === 'business_owner') {
+      orgId = generateUUID();
+    }
 
     if (supabase && !isOffline) {
       try {
-        const { error: orgErr } = await supabase.from('organizations').insert({
-          id: orgId,
-          name: orgName,
-          logo_url: orgLogo || '',
-          support_phone: '+91 1800 123 4567'
-        });
-        if (orgErr) throw orgErr;
+        if (role === 'business_owner') {
+          const { error: orgErr } = await supabase.from('organizations').insert({
+            id: orgId,
+            name: orgName,
+            logo_url: orgLogo || '',
+            support_phone: '+91 1800 123 4567',
+            msme_certificate_url: msmeCertUrl || null,
+            is_verified: false
+          });
+          if (orgErr) throw orgErr;
 
-        const { error: admErr } = await supabase.from('admins').insert({
-          id: adminId,
+          const defaultSteps = DEFAULT_MILESTONES_SEQUENCE.map((step, idx) => ({
+            step_name: step,
+            step_order: idx,
+            organization_id: orgId
+          }));
+          await supabase.from('milestone_sequences').insert(defaultSteps);
+        }
+
+        const { error: userErr } = await supabase.from('users').insert({
+          id: userId,
           name,
           email,
-          password,
+          role,
           organization_id: orgId
         });
-        if (admErr) throw admErr;
-
-        const defaultSteps = DEFAULT_MILESTONES_SEQUENCE.map((step, idx) => ({
-          step_name: step,
-          step_order: idx,
-          organization_id: orgId
-        }));
-        await supabase.from('milestone_sequences').insert(defaultSteps);
+        if (userErr) throw userErr;
 
         await loadFromSupabase();
 
         setIsAuthenticated(true);
-        setAdminUser({ name, email, organizationId: orgId });
+        setCurrentUser({ id: userId, name, email, role, organizationId: orgId, walletBalance: 0 });
         return true;
       } catch (err) {
         console.error('Database sign up failed:', err);
@@ -445,21 +475,23 @@ export const DatabaseProvider = ({ children }) => {
     }
 
     try {
-      const registered = localStorage.getItem('cleardrop_registered_admins');
-      const adminsList = registered ? JSON.parse(registered) : [];
-      if (adminsList.some(a => a.email === email)) {
+      const registered = localStorage.getItem('cleardrop_registered_users');
+      const usersList = registered ? JSON.parse(registered) : [];
+      if (usersList.some(a => a.email === email)) {
         return false;
       }
 
-      const newAdmin = { name, email, password, organizationId: orgId };
-      adminsList.push(newAdmin);
-      localStorage.setItem('cleardrop_registered_admins', JSON.stringify(adminsList));
+      const newUser = { id: userId, name, email, password, role, organizationId: orgId, walletBalance: 0 };
+      usersList.push(newUser);
+      localStorage.setItem('cleardrop_registered_users', JSON.stringify(usersList));
 
       setIsAuthenticated(true);
-      setAdminUser({ name, email, organizationId: orgId });
+      setCurrentUser({ id: userId, name, email, role, organizationId: orgId, walletBalance: 0 });
 
-      const newBranding = { companyName: orgName, logoUrl: orgLogo || '', supportPhone: '+91 1800 123 4567' };
-      localStorage.setItem('cleardrop_branding', JSON.stringify(newBranding));
+      if (role === 'business_owner') {
+        const newBranding = { companyName: orgName, logoUrl: orgLogo || '', supportPhone: '+91 1800 123 4567', msmeCertificateUrl: msmeCertUrl, isVerified: false };
+        localStorage.setItem('cleardrop_branding', JSON.stringify(newBranding));
+      }
       
       loadLocalFallback();
       return true;
@@ -471,11 +503,11 @@ export const DatabaseProvider = ({ children }) => {
 
   const logout = () => {
     setIsAuthenticated(false);
-    setAdminUser(null);
+    setCurrentUser(null);
   };
 
   const updateBranding = async (newBranding) => {
-    const targetOrgId = adminUser?.organizationId || '00000000-0000-0000-0000-000000000000';
+    const targetOrgId = currentUser?.organizationId || '00000000-0000-0000-0000-000000000000';
     setRawOrganizations(prev => prev.map(o => 
       o.id === targetOrgId ? { ...o, ...newBranding } : o
     ));
@@ -486,6 +518,10 @@ export const DatabaseProvider = ({ children }) => {
         if (newBranding.companyName !== undefined) updateObj.name = newBranding.companyName;
         if (newBranding.logoUrl !== undefined) updateObj.logo_url = newBranding.logoUrl;
         if (newBranding.supportPhone !== undefined) updateObj.support_phone = newBranding.supportPhone;
+        if (newBranding.isVerified !== undefined) updateObj.is_verified = newBranding.isVerified;
+        if (newBranding.serviceableCities !== undefined) updateObj.serviceable_cities = newBranding.serviceableCities;
+        if (newBranding.pricePerKm !== undefined) updateObj.price_per_km = newBranding.pricePerKm;
+        if (newBranding.advancePercent !== undefined) updateObj.advance_percent = newBranding.advancePercent;
 
         await supabase
           .from('organizations')
@@ -499,6 +535,23 @@ export const DatabaseProvider = ({ children }) => {
       const current = localBranding ? JSON.parse(localBranding) : DEFAULT_BRANDING;
       const updated = { ...current, ...newBranding };
       localStorage.setItem('cleardrop_branding', JSON.stringify(updated));
+    }
+  };
+
+  const toggleOrganizationVerification = async (orgId, isVerified) => {
+    setRawOrganizations(prev => prev.map(o => 
+      o.id === orgId ? { ...o, isVerified } : o
+    ));
+
+    if (supabase && !isOffline) {
+      try {
+        await supabase
+          .from('organizations')
+          .update({ is_verified: isVerified })
+          .eq('id', orgId);
+      } catch (err) {
+        console.error('Failed to toggle verification in Supabase:', err);
+      }
     }
   };
 
@@ -696,7 +749,13 @@ export const DatabaseProvider = ({ children }) => {
           destination: newParcel.destination,
           current_driver_id: newParcel.currentDriverId || null,
           status: newParcel.status,
-          organization_id: newParcel.organizationId
+          organization_id: newParcel.organizationId,
+          customer_id: newParcel.customerId || null,
+          parcel_dimensions: newParcel.parcelDimensions || null,
+          parcel_weight: newParcel.parcelWeight || null,
+          parcel_type: newParcel.parcelType || null,
+          pickup_address: newParcel.pickupAddress || null,
+          escrow_locked_amount: newParcel.escrowLockedAmount || 0
         });
       } catch (err) {
         console.error('Failed to create parcel in Supabase:', err);
@@ -877,14 +936,72 @@ export const DatabaseProvider = ({ children }) => {
   const getMilestonesForParcel = (parcelId) => rawMilestones.filter(m => m.parcelId === parcelId).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   const getDriverById = (id) => rawDrivers.find(d => d.id === id);
 
+  const approveParcel = async (parcelId) => {
+    setRawParcels(prev => prev.map(p => 
+      p.id === parcelId ? { ...p, status: 'Awaiting Customer Payment' } : p
+    ));
+    if (supabase && !isOffline) {
+      await supabase.from('parcels').update({ status: 'Awaiting Customer Payment' }).eq('id', parcelId);
+    }
+  };
+
+  const processParcelPayment = async (parcelId, orgId, totalCost, advancePercent) => {
+    const advanceAmount = (totalCost * advancePercent) / 100;
+    const escrowAmount = totalCost - advanceAmount;
+
+    // Deduct total cost from Customer wallet
+    const newCustomerBalance = (currentUser.walletBalance || 0) - totalCost;
+    setCurrentUser(prev => ({ ...prev, walletBalance: newCustomerBalance }));
+
+    // Update Org wallet locally
+    setRawOrganizations(prev => prev.map(o => 
+      o.id === orgId ? { ...o, walletBalance: (o.walletBalance || 0) + advanceAmount } : o
+    ));
+
+    // Update Parcel locally
+    setRawParcels(prev => prev.map(p => 
+      p.id === parcelId ? { ...p, status: 'Ready for Pickup', escrowLockedAmount: escrowAmount } : p
+    ));
+
+    if (supabase && !isOffline) {
+      // 1. Update customer wallet
+      await supabase.from('users').update({ wallet_balance: newCustomerBalance }).eq('id', currentUser.id);
+      
+      // 2. Update Org wallet
+      const { data: orgData } = await supabase.from('organizations').select('wallet_balance').eq('id', orgId).single();
+      const currentOrgBalance = orgData?.wallet_balance || 0;
+      await supabase.from('organizations').update({ wallet_balance: currentOrgBalance + advanceAmount }).eq('id', orgId);
+
+      // 3. Update Parcel
+      await supabase.from('parcels').update({ status: 'Ready for Pickup', escrow_locked_amount: escrowAmount }).eq('id', parcelId);
+    }
+  };
+
+  const addCustomerFunds = async (amount) => {
+    const newBalance = (currentUser.walletBalance || 0) + amount;
+    setCurrentUser(prev => ({ ...prev, walletBalance: newBalance }));
+    if (supabase && !isOffline) {
+      await supabase.from('users').update({ wallet_balance: newBalance }).eq('id', currentUser.id);
+    } else {
+       // fallback for local users
+       const registered = localStorage.getItem('cleardrop_registered_users');
+       if (registered) {
+         const usersList = JSON.parse(registered);
+         const updatedList = usersList.map(u => u.id === currentUser.id ? { ...u, walletBalance: newBalance } : u);
+         localStorage.setItem('cleardrop_registered_users', JSON.stringify(updatedList));
+       }
+    }
+  };
+
   return (
     <DatabaseContext.Provider value={{
       drivers,
       parcels,
       milestones,
       milestoneSequence,
+      organizations: rawOrganizations,
       isAuthenticated,
-      adminUser,
+      currentUser,
       branding,
       isOffline,
       connectionError,
@@ -893,6 +1010,7 @@ export const DatabaseProvider = ({ children }) => {
       signUp,
       logout,
       updateBranding,
+      toggleOrganizationVerification,
       addDriver,
       removeDriver,
       addMilestoneStep,
@@ -907,7 +1025,10 @@ export const DatabaseProvider = ({ children }) => {
       deleteParcel,
       getParcelById,
       getMilestonesForParcel,
-      getDriverById
+      getDriverById,
+      approveParcel,
+      processParcelPayment,
+      addCustomerFunds
     }}>
       {children}
     </DatabaseContext.Provider>

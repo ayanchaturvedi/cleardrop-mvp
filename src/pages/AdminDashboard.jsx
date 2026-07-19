@@ -11,6 +11,7 @@ const AdminDashboard = () => {
     createParcel, 
     assignDriver, 
     deleteParcel,
+    approveParcel,
     addDriver,
     removeDriver,
     addMilestoneStep,
@@ -106,9 +107,12 @@ const AdminDashboard = () => {
   });
 
   const [settingsForm, setSettingsForm] = useState({
-    companyName: branding.companyName,
-    supportPhone: branding.supportPhone,
-    logoUrl: branding.logoUrl
+    companyName: branding.companyName || '',
+    supportPhone: branding.supportPhone || '',
+    logoUrl: branding.logoUrl || '',
+    serviceableCities: (branding.serviceableCities || []).join(', '),
+    pricePerKm: branding.pricePerKm || 0,
+    advancePercent: branding.advancePercent || 0
   });
 
   const [newMilestoneName, setNewMilestoneName] = useState('');
@@ -118,14 +122,40 @@ const AdminDashboard = () => {
   // Sync settings form state when database branding updates
   useEffect(() => {
     setSettingsForm({
-      companyName: branding.companyName,
-      supportPhone: branding.supportPhone,
-      logoUrl: branding.logoUrl
+      companyName: branding.companyName || '',
+      supportPhone: branding.supportPhone || '',
+      logoUrl: branding.logoUrl || '',
+      serviceableCities: (branding.serviceableCities || []).join(', '),
+      pricePerKm: branding.pricePerKm || 0,
+      advancePercent: branding.advancePercent || 0
     });
   }, [branding]);
 
-  const activeParcels = parcels.filter(p => p.status !== 'Delivered');
-  const deliveredParcels = parcels.filter(p => p.status === 'Delivered');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+
+  const newRequests = parcels.filter(p => p.status === 'Awaiting Org Approval');
+
+  const filteredParcels = parcels.filter(p => {
+    if (p.status === 'Awaiting Org Approval') return false;
+    
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = !query || 
+      (p.senderName || '').toLowerCase().includes(query) ||
+      (p.trackingNumber || '').toLowerCase().includes(query) ||
+      (p.recipientPhone || '').toLowerCase().includes(query);
+    
+    let matchesFilter = true;
+    if (statusFilter === 'Delivered') matchesFilter = p.status === 'Delivered';
+    if (statusFilter === 'In Transit') matchesFilter = p.status !== 'Delivered' && p.status !== 'Ready for Pickup' && p.status !== 'Awaiting Customer Payment' && !p.status.includes('Delay');
+    if (statusFilter === 'Delayed') matchesFilter = p.status.includes('Delay');
+    if (statusFilter === 'Pending Pickup') matchesFilter = p.status === 'Ready for Pickup';
+
+    return matchesSearch && matchesFilter;
+  });
+
+  const activeParcels = filteredParcels.filter(p => p.status !== 'Delivered');
+  const deliveredParcels = filteredParcels.filter(p => p.status === 'Delivered');
 
   // Helpers
   const getInitials = (name) => {
@@ -144,6 +174,10 @@ const AdminDashboard = () => {
 
   const handleCreateParcel = async (e) => {
     e.preventDefault();
+    if (!branding.isVerified) {
+      alert('Your organization must be verified to accept parcels.');
+      return;
+    }
     if (!parcelForm.senderName || !parcelForm.destination) return;
     
     const newParcelId = `p${Date.now()}`;
@@ -267,7 +301,13 @@ const AdminDashboard = () => {
 
   const handleSaveSettings = (e) => {
     e.preventDefault();
-    updateBranding(settingsForm);
+    const updated = {
+      ...settingsForm,
+      serviceableCities: settingsForm.serviceableCities.split(',').map(s => s.trim()).filter(Boolean),
+      pricePerKm: Number(settingsForm.pricePerKm),
+      advancePercent: Number(settingsForm.advancePercent)
+    };
+    updateBranding(updated);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   };
@@ -332,7 +372,12 @@ const AdminDashboard = () => {
         </div>
         
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          {!isDelivered && (
+          {parcel.status === 'Awaiting Org Approval' && (
+             <button onClick={() => approveParcel(parcel.id)} className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+               Approve Request
+             </button>
+          )}
+          {!isDelivered && parcel.status !== 'Awaiting Org Approval' && parcel.status !== 'Awaiting Customer Payment' && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
               <select 
                 className="input-field" 
@@ -427,6 +472,21 @@ const AdminDashboard = () => {
           }}>
             Admin Dashboard
           </span>
+          <div style={{ 
+            marginLeft: '1rem',
+            padding: '0.5rem 1rem',
+            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+            color: '#16a34a',
+            borderRadius: '999px',
+            fontWeight: '700',
+            fontSize: '0.9rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <span>Wallet:</span>
+            <span>₹{(branding.walletBalance || 0).toLocaleString()}</span>
+          </div>
         </div>
 
         {/* Profile Section & Log Out */}
@@ -502,6 +562,27 @@ const AdminDashboard = () => {
           marginBottom: '2rem' 
         }}>
           <button 
+            onClick={() => setActiveTab('requests')} 
+            style={{ 
+              padding: '0.75rem 1.25rem', 
+              borderBottom: activeTab === 'requests' ? '3px solid var(--primary-color)' : '3px solid transparent', 
+              fontWeight: '700', 
+              fontSize: '0.95rem',
+              color: activeTab === 'requests' ? 'var(--primary-color)' : 'var(--text-secondary)',
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            New Requests
+            {newRequests.length > 0 && (
+              <span style={{ backgroundColor: 'var(--error)', color: 'white', padding: '0.1rem 0.5rem', borderRadius: '999px', fontSize: '0.75rem' }}>
+                {newRequests.length}
+              </span>
+            )}
+          </button>
+          <button 
             onClick={() => setActiveTab('parcels')} 
             style={{ 
               padding: '0.75rem 1.25rem', 
@@ -563,7 +644,12 @@ const AdminDashboard = () => {
               <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <ClipboardList size={20} color="var(--primary-color)" /> New Parcel
               </h2>
-              <form onSubmit={handleCreateParcel} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {!branding.isVerified && (
+                <div style={{ padding: '1rem', backgroundColor: '#fee2e2', color: '#dc2626', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
+                  Your organization is currently unverified. You cannot create new parcels until a Super Admin approves your account.
+                </div>
+              )}
+              <form onSubmit={handleCreateParcel} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', opacity: branding.isVerified ? 1 : 0.6, pointerEvents: branding.isVerified ? 'auto' : 'none' }}>
                 
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
@@ -597,7 +683,7 @@ const AdminDashboard = () => {
                   <textarea className="input-field" name="destination" value={parcelForm.destination} onChange={handleParcelChange} rows="3" placeholder="e.g. 45, 12th Main Rd, Koramangala, Bengaluru" required style={{ resize: 'vertical' }} />
                 </div>
 
-                <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '0.5rem', fontWeight: '700' }}>
+                <button type="submit" disabled={!branding.isVerified} className="btn btn-primary" style={{ width: '100%', marginTop: '0.5rem', fontWeight: '700' }}>
                   Create Parcel
                 </button>
               </form>
@@ -606,6 +692,30 @@ const AdminDashboard = () => {
             {/* Parcels Lists Area */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
               
+              {/* Search and Filter */}
+              <div className="card" style={{ boxShadow: 'var(--shadow-md)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  placeholder="Search by Tracking ID, Sender, Phone..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ flex: 2 }}
+                />
+                <select 
+                  className="input-field" 
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  style={{ flex: 1 }}
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Delivered">Delivered</option>
+                  <option value="In Transit">In Transit</option>
+                  <option value="Delayed">Delayed</option>
+                  <option value="Pending Pickup">Pending Pickup</option>
+                </select>
+              </div>
+
               {/* Active Parcels List */}
               <div className="card" style={{ boxShadow: 'var(--shadow-md)' }}>
                 <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -630,6 +740,36 @@ const AdminDashboard = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                     {deliveredParcels.map(p => renderParcelCard(p, true))}
                   </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab: New Requests */}
+        {activeTab === 'requests' && (
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+              Pending Organization Approvals
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {newRequests.map(p => (
+                <div key={p.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ margin: 0 }}>{p.trackingNumber}</h3>
+                    <p style={{ margin: '0.2rem 0', color: 'var(--text-secondary)' }}>From: {p.senderName} | {p.recipientPhone}</p>
+                    <p style={{ margin: '0.2rem 0', color: 'var(--text-secondary)' }}>Destination: {p.destination}</p>
+                    <p style={{ margin: '0.2rem 0', color: 'var(--text-secondary)' }}>Details: {p.packageDetails}</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button onClick={() => deleteParcel(p.id)} className="btn btn-secondary" style={{ color: 'var(--error)' }}>Reject</button>
+                    <button onClick={() => approveParcel(p.id)} className="btn btn-primary">Approve Request</button>
+                  </div>
+                </div>
+              ))}
+              {newRequests.length === 0 && (
+                <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                  No pending requests at this time.
                 </div>
               )}
             </div>
@@ -914,7 +1054,33 @@ const AdminDashboard = () => {
                 </div>
 
                 <button type="submit" className="btn btn-primary" style={{ width: '100%', fontWeight: '700', marginTop: '0.5rem' }}>
-                  Save Settings
+                  Save Branding Settings
+                </button>
+              </form>
+            </div>
+
+            {/* Marketplace form */}
+            <div className="card" style={{ boxShadow: 'var(--shadow-md)', gridColumn: '1 / -1' }}>
+              <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                Marketplace Configuration
+              </h2>
+              <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <label className="label">Serviceable Cities (Comma separated)</label>
+                  <input className="input-field" name="serviceableCities" value={settingsForm.serviceableCities} onChange={handleSettingsChange} placeholder="e.g. Mumbai, Delhi, Bengaluru" />
+                </div>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                    <label className="label">Price per KM (₹)</label>
+                    <input className="input-field" type="number" name="pricePerKm" value={settingsForm.pricePerKm} onChange={handleSettingsChange} min="0" />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                    <label className="label">Advance Required (%)</label>
+                    <input className="input-field" type="number" name="advancePercent" value={settingsForm.advancePercent} onChange={handleSettingsChange} min="0" max="100" />
+                  </div>
+                </div>
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', fontWeight: '700' }}>
+                  Save Marketplace Settings
                 </button>
               </form>
             </div>
