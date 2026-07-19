@@ -560,7 +560,7 @@ export const DatabaseProvider = ({ children }) => {
     const newDriver = {
       ...driverData,
       id: `d${Date.now()}`,
-      organizationId: adminUser?.organizationId || '00000000-0000-0000-0000-000000000000'
+      organizationId: currentUser?.organizationId || '00000000-0000-0000-0000-000000000000'
     };
 
     setRawDrivers(prev => [...prev, newDriver]);
@@ -601,7 +601,7 @@ export const DatabaseProvider = ({ children }) => {
 
   // Milestone Sequence Actions
   const addMilestoneStep = async (stepName) => {
-    const targetOrgId = adminUser?.organizationId || '00000000-0000-0000-0000-000000000000';
+    const targetOrgId = currentUser?.organizationId || '00000000-0000-0000-0000-000000000000';
     if (milestoneSequence.includes(stepName)) return false;
 
     const nextSeq = [...milestoneSequence];
@@ -637,7 +637,7 @@ export const DatabaseProvider = ({ children }) => {
 
   const removeMilestoneStep = async (stepName) => {
     if (stepName === 'Delivered') return false;
-    const targetOrgId = adminUser?.organizationId || '00000000-0000-0000-0000-000000000000';
+    const targetOrgId = currentUser?.organizationId || '00000000-0000-0000-0000-000000000000';
     
     const nextSeq = milestoneSequence.filter(s => s !== stepName);
     setRawMilestoneSequences(nextSeq.map((step, idx) => ({
@@ -666,7 +666,7 @@ export const DatabaseProvider = ({ children }) => {
 
   const moveMilestoneStepUp = async (index) => {
     if (index <= 0 || index >= milestoneSequence.length - 1) return;
-    const targetOrgId = adminUser?.organizationId || '00000000-0000-0000-0000-000000000000';
+    const targetOrgId = currentUser?.organizationId || '00000000-0000-0000-0000-000000000000';
 
     const nextSeq = [...milestoneSequence];
     const temp = nextSeq[index];
@@ -697,7 +697,7 @@ export const DatabaseProvider = ({ children }) => {
 
   const moveMilestoneStepDown = async (index) => {
     if (index < 0 || index >= milestoneSequence.length - 2) return;
-    const targetOrgId = adminUser?.organizationId || '00000000-0000-0000-0000-000000000000';
+    const targetOrgId = currentUser?.organizationId || '00000000-0000-0000-0000-000000000000';
 
     const nextSeq = [...milestoneSequence];
     const temp = nextSeq[index];

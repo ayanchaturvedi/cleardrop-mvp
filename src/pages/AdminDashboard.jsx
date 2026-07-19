@@ -18,7 +18,7 @@ const AdminDashboard = () => {
     removeMilestoneStep,
     moveMilestoneStepUp,
     moveMilestoneStepDown,
-    adminUser,
+    currentUser,
     branding,
     updateBranding,
     logout,
@@ -39,7 +39,7 @@ const AdminDashboard = () => {
         return;
       }
       try {
-        const orgId = adminUser?.organizationId || '00000000-0000-0000-0000-000000000000';
+        const orgId = currentUser?.organizationId || '00000000-0000-0000-0000-000000000000';
         const { data, error } = await supabase
           .from('drivers')
           .select('*')
@@ -64,7 +64,7 @@ const AdminDashboard = () => {
         return;
       }
       try {
-        const orgId = adminUser?.organizationId || '00000000-0000-0000-0000-000000000000';
+        const orgId = currentUser?.organizationId || '00000000-0000-0000-0000-000000000000';
         const { data, error } = await supabase
           .from('parcels')
           .select('*')
@@ -90,7 +90,7 @@ const AdminDashboard = () => {
 
     fetchDrivers();
     fetchParcels();
-  }, [adminUser, isOffline, contextDrivers, contextParcels]);
+  }, [currentUser, isOffline, contextDrivers, contextParcels]);
 
   // Forms State
   const [parcelForm, setParcelForm] = useState({
@@ -182,7 +182,7 @@ const AdminDashboard = () => {
     
     const newParcelId = `p${Date.now()}`;
     const trackingNumber = `CD-${Math.floor(1000000 + Math.random() * 9000000)}`;
-    const orgId = adminUser?.organizationId || '00000000-0000-0000-0000-000000000000';
+    const orgId = currentUser?.organizationId || '00000000-0000-0000-0000-000000000000';
     
     const newParcel = {
       id: newParcelId,
@@ -235,7 +235,7 @@ const AdminDashboard = () => {
     if (!driverForm.name || !driverForm.phone || !driverForm.vehicleNumber) return;
 
     const newDriverId = `d${Date.now()}`;
-    const orgId = adminUser?.organizationId || '00000000-0000-0000-0000-000000000000';
+    const orgId = currentUser?.organizationId || '00000000-0000-0000-0000-000000000000';
     const newDriver = {
       id: newDriverId,
       name: driverForm.name,
@@ -471,22 +471,6 @@ const AdminDashboard = () => {
             fontWeight: '600'
           }}>
             Admin Dashboard
-          </span>
-          <div style={{ 
-            marginLeft: '1rem',
-            padding: '0.5rem 1rem',
-            backgroundColor: 'rgba(34, 197, 94, 0.1)',
-            color: '#16a34a',
-            borderRadius: '999px',
-            fontWeight: '700',
-            fontSize: '0.9rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <span>Wallet:</span>
-            <span>₹{(branding.walletBalance || 0).toLocaleString()}</span>
-          </div>
         </div>
 
         {/* Profile Section & Log Out */}
@@ -494,10 +478,10 @@ const AdminDashboard = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
               <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)' }}>
-                {adminUser?.name || 'Admin User'}
+                {currentUser?.name || 'Admin User'}
               </span>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                {adminUser?.email || 'admin@cleardrop.com'}
+                {currentUser?.email || 'admin@cleardrop.com'}
               </span>
             </div>
             <div style={{ 
@@ -513,7 +497,7 @@ const AdminDashboard = () => {
               fontSize: '0.9rem',
               border: '2px solid var(--primary-light)'
             }}>
-              {getInitials(adminUser?.name)}
+              {getInitials(currentUser?.name)}
             </div>
           </div>
 
@@ -1059,32 +1043,6 @@ const AdminDashboard = () => {
               </form>
             </div>
 
-            {/* Marketplace form */}
-            <div className="card" style={{ boxShadow: 'var(--shadow-md)', gridColumn: '1 / -1' }}>
-              <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                Marketplace Configuration
-              </h2>
-              <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <label className="label">Serviceable Cities (Comma separated)</label>
-                  <input className="input-field" name="serviceableCities" value={settingsForm.serviceableCities} onChange={handleSettingsChange} placeholder="e.g. Mumbai, Delhi, Bengaluru" />
-                </div>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                    <label className="label">Price per KM (₹)</label>
-                    <input className="input-field" type="number" name="pricePerKm" value={settingsForm.pricePerKm} onChange={handleSettingsChange} min="0" />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                    <label className="label">Advance Required (%)</label>
-                    <input className="input-field" type="number" name="advancePercent" value={settingsForm.advancePercent} onChange={handleSettingsChange} min="0" max="100" />
-                  </div>
-                </div>
-                <button type="submit" className="btn btn-primary" style={{ width: '100%', fontWeight: '700' }}>
-                  Save Marketplace Settings
-                </button>
-              </form>
-            </div>
-
             {/* Live Branding Preview */}
             <div className="card" style={{ boxShadow: 'var(--shadow-md)' }}>
               <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)' }}>
@@ -1117,6 +1075,34 @@ const AdminDashboard = () => {
                 </div>
               </div>
             </div>
+
+            {/* Marketplace form */}
+            <div className="card" style={{ boxShadow: 'var(--shadow-md)', gridColumn: '1 / -1' }}>
+              <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                Marketplace Configuration
+              </h2>
+              <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <label className="label">Serviceable Cities (Comma separated)</label>
+                  <input className="input-field" name="serviceableCities" value={settingsForm.serviceableCities} onChange={handleSettingsChange} placeholder="e.g. Mumbai, Delhi, Bengaluru" />
+                </div>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                    <label className="label">Price per KM (₹)</label>
+                    <input className="input-field" type="number" name="pricePerKm" value={settingsForm.pricePerKm} onChange={handleSettingsChange} min="0" />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                    <label className="label">Advance Required (%)</label>
+                    <input className="input-field" type="number" name="advancePercent" value={settingsForm.advancePercent} onChange={handleSettingsChange} min="0" max="100" />
+                  </div>
+                </div>
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', fontWeight: '700' }}>
+                  Save Marketplace Settings
+                </button>
+              </form>
+            </div>
+
+
 
           </div>
         )}
