@@ -351,7 +351,10 @@ export const DatabaseProvider = ({ children }) => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'organizations' }, () => {
         loadBrandingOnly();
       })
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log('[Realtime] Channel subscription status:', status);
+        if (err) console.error('[Realtime] Channel subscription error:', err);
+      });
 
     return () => {
       supabase.removeChannel(dbChannel);
