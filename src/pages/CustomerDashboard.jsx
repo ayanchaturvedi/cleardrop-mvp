@@ -123,7 +123,7 @@ const CustomerDashboard = () => {
     }
   };
 
-  const myParcels = parcels.filter(p => p.customerId === currentUser.id);
+  const myParcels = parcels.filter(p => p.customerId === currentUser.id || p.status === 'AWAITING CUSTOMER PAYMENT' || p.status === 'Awaiting Customer Payment');
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-color)' }}>
@@ -194,7 +194,7 @@ const CustomerDashboard = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
             {myParcels.map(parcel => {
               const org = organizations.find(o => o.id === parcel.organizationId);
-              const isAwaitingPayment = parcel.status === 'Awaiting Customer Payment';
+              const isAwaitingPayment = parcel.status === 'AWAITING CUSTOMER PAYMENT' || parcel.status === 'Awaiting Customer Payment';
               const distance = extractDistance(parcel.packageDetails);
               const cost = distance * (org?.pricePerKm || 0);
 
@@ -221,7 +221,7 @@ const CustomerDashboard = () => {
                   </div>
                   {isAwaitingPayment && (
                     <button onClick={() => setPaymentParcel(parcel)} className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
-                      <CreditCard size={16} /> Pay & Confirm
+                      <CreditCard size={16} /> {parcel.status === 'AWAITING CUSTOMER PAYMENT' ? 'Pay Advance' : 'Pay & Confirm'}
                     </button>
                   )}
                 </div>

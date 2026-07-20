@@ -341,7 +341,9 @@ export const DatabaseProvider = ({ children }) => {
     : rawDrivers.filter(d => d.organizationId === activeOrgId);
 
   const parcels = currentUser
-    ? rawParcels.filter(p => p.organizationId === currentUser.organizationId)
+    ? (currentUser.role === 'business_owner' || currentUser.role === 'admin'
+        ? rawParcels.filter(p => p.organizationId === currentUser.organizationId)
+        : rawParcels)
     : rawParcels;
 
   const milestones = rawMilestones;
