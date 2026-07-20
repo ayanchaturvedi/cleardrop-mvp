@@ -4,7 +4,7 @@ import { Shield, CheckCircle, XCircle, FileText, Building, Phone, LogOut } from 
 import { Navigate } from 'react-router-dom';
 
 const SuperAdminDashboard = () => {
-  const { organizations, currentUser, toggleOrganizationVerification, logout } = useDatabase();
+  const { organizations, currentUser, toggleOrganizationVerification, rejectOrganizationCertificate, logout } = useDatabase();
 
   if (!currentUser || currentUser.role !== 'super_admin') {
     return <Navigate to="/" />;
@@ -12,6 +12,12 @@ const SuperAdminDashboard = () => {
 
   const handleToggleVerification = async (orgId, currentStatus) => {
     await toggleOrganizationVerification(orgId, !currentStatus);
+  };
+
+  const handleRejectCertificate = async (orgId) => {
+    if (window.confirm("Are you sure you want to reject and remove this organization's certificate?")) {
+      await rejectOrganizationCertificate(orgId);
+    }
   };
 
   return (
@@ -95,18 +101,34 @@ const SuperAdminDashboard = () => {
                     )}
                   </div>
 
-                  <button 
-                    onClick={() => handleToggleVerification(org.id, org.isVerified)}
-                    className="btn"
-                    style={{ 
-                      backgroundColor: org.isVerified ? '#dc2626' : '#16a34a',
-                      color: 'white',
-                      fontWeight: '600',
-                      padding: '0.5rem 1rem'
-                    }}
-                  >
-                    {org.isVerified ? 'Revoke Verification' : 'Verify Organization'}
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <button 
+                      onClick={() => handleToggleVerification(org.id, org.isVerified)}
+                      className="btn"
+                      style={{ 
+                        backgroundColor: org.isVerified ? '#f59e0b' : '#16a34a',
+                        color: 'white',
+                        fontWeight: '600',
+                        padding: '0.5rem 1rem'
+                      }}
+                    >
+                      {org.isVerified ? 'Revoke Verification' : 'Verify Organization'}
+                    </button>
+                    {org.msmeCertificateUrl && (
+                      <button 
+                        onClick={() => handleRejectCertificate(org.id)}
+                        className="btn"
+                        style={{ 
+                          backgroundColor: '#dc2626',
+                          color: 'white',
+                          fontWeight: '600',
+                          padding: '0.5rem 1rem'
+                        }}
+                      >
+                        Reject Certificate
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

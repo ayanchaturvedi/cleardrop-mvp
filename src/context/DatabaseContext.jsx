@@ -559,6 +559,23 @@ export const DatabaseProvider = ({ children }) => {
     }
   };
 
+  const rejectOrganizationCertificate = async (orgId) => {
+    setRawOrganizations(prev => prev.map(o => 
+      o.id === orgId ? { ...o, isVerified: false, msmeCertificateUrl: null } : o
+    ));
+
+    if (supabase && !isOffline) {
+      try {
+        await supabase
+          .from('organizations')
+          .update({ is_verified: false, msme_certificate_url: null })
+          .eq('id', orgId);
+      } catch (err) {
+        console.error('Failed to reject certificate in Supabase:', err);
+      }
+    }
+  };
+
   // Driver Actions
   const addDriver = async (driverData) => {
     const newDriver = {
@@ -1019,6 +1036,7 @@ export const DatabaseProvider = ({ children }) => {
       logout,
       updateBranding,
       toggleOrganizationVerification,
+      rejectOrganizationCertificate,
       addDriver,
       removeDriver,
       addMilestoneStep,
