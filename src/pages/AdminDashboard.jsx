@@ -110,6 +110,7 @@ const AdminDashboard = () => {
     companyName: branding.companyName || '',
     supportPhone: branding.supportPhone || '',
     logoUrl: branding.logoUrl || '',
+    msmeCertificateUrl: branding.msmeCertificateUrl || '',
     serviceableCities: (branding.serviceableCities || []).join(', '),
     pricePerKm: branding.pricePerKm || 0,
     advancePercent: branding.advancePercent || 0
@@ -125,6 +126,7 @@ const AdminDashboard = () => {
       companyName: branding.companyName || '',
       supportPhone: branding.supportPhone || '',
       logoUrl: branding.logoUrl || '',
+      msmeCertificateUrl: branding.msmeCertificateUrl || '',
       serviceableCities: (branding.serviceableCities || []).join(', '),
       pricePerKm: branding.pricePerKm || 0,
       advancePercent: branding.advancePercent || 0
@@ -296,6 +298,31 @@ const AdminDashboard = () => {
         setSettingsForm(prev => ({ ...prev, logoUrl: reader.result }));
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCertificateUpload = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (supabase && !isOffline) {
+        try {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+          const { error: uploadError } = await supabase.storage.from('msme-certificates').upload(fileName, file);
+          if (uploadError) throw uploadError;
+          const { data: publicUrlData } = supabase.storage.from('msme-certificates').getPublicUrl(fileName);
+          setSettingsForm(prev => ({ ...prev, msmeCertificateUrl: publicUrlData.publicUrl }));
+        } catch (err) {
+          console.error(err);
+          alert('Failed to upload certificate.');
+        }
+      } else {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setSettingsForm(prev => ({ ...prev, msmeCertificateUrl: reader.result }));
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -1035,6 +1062,24 @@ const AdminDashboard = () => {
                     <Upload size={16} style={{ color: 'var(--text-secondary)' }} />
                     <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Upload Logo Image File</span>
                     <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+                  </label>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', marginTop: '0.5rem' }}>
+                  <label className="label">MSME Certificate (Direct URL)</label>
+                  <input 
+                    className="input-field" 
+                    name="msmeCertificateUrl" 
+                    value={settingsForm.msmeCertificateUrl} 
+                    onChange={handleSettingsChange} 
+                    placeholder="e.g. https://domain.com/cert.pdf" 
+                  />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', margin: '0.5rem 0' }}>— OR —</span>
+                  
+                  <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', border: '1px dashed var(--border-color)', padding: '0.75rem', borderRadius: 'var(--border-radius-md)', cursor: 'pointer', justifyContent: 'center', backgroundColor: '#f8fafc' }}>
+                    <Upload size={16} style={{ color: 'var(--text-secondary)' }} />
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Upload MSME Certificate</span>
+                    <input type="file" accept=".pdf,image/*" onChange={handleCertificateUpload} style={{ display: 'none' }} />
                   </label>
                 </div>
 
