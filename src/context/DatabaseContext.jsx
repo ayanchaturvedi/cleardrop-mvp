@@ -138,6 +138,17 @@ export const DatabaseProvider = ({ children }) => {
   const [connectionError, setConnectionError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const currentUserRef = React.useRef(currentUser);
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+  }, []);
+
   // Raw Database Arrays
   const [rawDrivers, setRawDrivers] = useState([]);
   const [rawParcels, setRawParcels] = useState([]);
@@ -277,11 +288,46 @@ export const DatabaseProvider = ({ children }) => {
 
     const dbChannel = supabase
       .channel('db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'parcels' }, () => {
-        loadParcelsOnly();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'parcels' }, (payload) => {
+        const newParcel = mapParcelFromDb(payload.new);
+        setRawParcels(prev => {
+          if (!prev.some(p => p.id === newParcel.id)) return [newParcel, ...prev];
+          return prev;
+        });
+
+        const current = currentUserRef.current;
+        if (
+          current && 
+          (current.role === 'business_owner' || current.role === 'super_admin' || current.role === 'admin') &&
+          newParcel.status === 'Awaiting Org Approval'
+        ) {
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('New Parcel Request', {
+              body: `Tracking Number: ${newParcel.trackingNumber}\nFrom: ${newParcel.senderName}`,
+            });
+          }
+        }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'milestones' }, () => {
-        loadMilestonesOnly();
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'parcels' }, (payload) => {
+        const updatedParcel = mapParcelFromDb(payload.new);
+        setRawParcels(prev => prev.map(p => p.id === updatedParcel.id ? updatedParcel : p));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'parcels' }, (payload) => {
+        setRawParcels(prev => prev.filter(p => p.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'milestones' }, (payload) => {
+        const newMilestone = mapMilestoneFromDb(payload.new);
+        setRawMilestones(prev => {
+          if (!prev.some(m => m.id === newMilestone.id)) return [...prev, newMilestone];
+          return prev;
+        });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'milestones' }, (payload) => {
+        const updatedMilestone = mapMilestoneFromDb(payload.new);
+        setRawMilestones(prev => prev.map(m => m.id === updatedMilestone.id ? updatedMilestone : m));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'milestones' }, (payload) => {
+        setRawMilestones(prev => prev.filter(m => m.id !== payload.old.id));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => {
         loadDriversOnly();
@@ -526,6 +572,7 @@ export const DatabaseProvider = ({ children }) => {
         if (newBranding.serviceableCities !== undefined) updateObj.serviceable_cities = newBranding.serviceableCities;
         if (newBranding.pricePerKm !== undefined) updateObj.price_per_km = newBranding.pricePerKm;
         if (newBranding.advancePercent !== undefined) updateObj.advance_percent = newBranding.advancePercent;
+        if (newBranding.msmeCertificateUrl !== undefined) updateObj.msme_certificate_url = newBranding.msmeCertificateUrl;
 
         await supabase
           .from('organizations')
