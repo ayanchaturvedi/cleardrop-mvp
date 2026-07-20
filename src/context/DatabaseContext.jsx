@@ -296,15 +296,31 @@ export const DatabaseProvider = ({ children }) => {
         });
 
         const current = currentUserRef.current;
+        console.log('[Realtime] Parcel INSERT received:', newParcel);
+        console.log('[Realtime] Current user:', current);
+
         if (
           current && 
           (current.role === 'business_owner' || current.role === 'super_admin' || current.role === 'admin') &&
           newParcel.status === 'Awaiting Org Approval'
         ) {
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('New Parcel Request', {
-              body: `Tracking Number: ${newParcel.trackingNumber}\nFrom: ${newParcel.senderName}`,
-            });
+          // Scope notification to the correct organization owner/admin
+          if (current.role === 'super_admin' || current.organizationId === newParcel.organizationId) {
+            console.log('[Realtime] Triggering notification. Permission:', Notification.permission);
+            if ('Notification' in window && Notification.permission === 'granted') {
+              try {
+                new Notification('New Parcel Request', {
+                  body: `Tracking Number: ${newParcel.trackingNumber}\nFrom: ${newParcel.senderName}`,
+                });
+                console.log('[Realtime] Notification spawned successfully.');
+              } catch (err) {
+                console.error('[Realtime] Failed to spawn notification:', err);
+              }
+            } else {
+              console.warn('[Realtime] Notification permission not granted. Current state:', Notification.permission);
+            }
+          } else {
+            console.log('[Realtime] Ignoring notification: Parcel belongs to a different organization.');
           }
         }
       })
